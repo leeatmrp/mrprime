@@ -28,7 +28,7 @@ export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] 
     { leads: 0, contacted: 0, sent: 0, replies: 0, bounces: 0, opps: 0 }
   )
   const totalLeadsLeft = totals.leads - totals.contacted
-  const totalProgressPct = totals.leads > 0 ? (totals.contacted / totals.leads) * 100 : 0
+  const totalProgressPct = totals.leads > 0 ? Math.min((totals.contacted / totals.leads) * 100, 100) : 0
   const totalReplyRate = totals.sent > 0 ? (totals.replies / totals.sent) * 100 : 0
   const totalBounceRate = totals.sent > 0 ? (totals.bounces / totals.sent) * 100 : 0
 
@@ -58,7 +58,7 @@ export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] 
               const leads = c.leads_count || 0
               const contacted = c.contacted_count || 0
               const leadsLeft = leads - contacted
-              const progressPct = leads > 0 ? (contacted / leads) * 100 : 0
+              const progressPct = leads > 0 ? Math.min((contacted / leads) * 100, 100) : 0
               const replyRate = sent > 0 ? (c.reply_count / sent) * 100 : 0
               const bRate = sent > 0 ? (c.bounce_count / sent) * 100 : 0
               const status = statusLabels[c.status] || statusLabels[0]
