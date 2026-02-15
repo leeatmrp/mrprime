@@ -41,7 +41,7 @@ export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] 
         <table className="w-full text-sm">
           <thead>
             <tr style={{ background: '#111827' }}>
-              {['Campaign', 'Status', 'Leads Left', '% Left', 'Sent', 'Replies', 'Reply %', 'Bounces', 'Bounce %', 'Opps'].map(h => (
+              {['Campaign', 'Status', 'Sent', 'Replies', 'Reply %', 'Bounces', 'Bounce %', 'Opps', 'Leads Left', '% Left'].map(h => (
                 <th
                   key={h}
                   className="px-4 py-3 text-left font-medium whitespace-nowrap"
@@ -80,12 +80,6 @@ export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] 
                       {status.label}
                     </span>
                   </td>
-                  <td className="px-4 py-3 tabular-nums" style={{ color: leadsLeft > 0 ? '#f59e0b' : '#6b7280' }}>
-                    {leadsLeft.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3 tabular-nums" style={{ color: leadsLeftPct > 50 ? '#10b981' : leadsLeftPct > 20 ? '#f59e0b' : '#ef4444' }}>
-                    {leadsLeftPct.toFixed(1)}%
-                  </td>
                   <td className="px-4 py-3 text-white tabular-nums">
                     {sent.toLocaleString()}
                   </td>
@@ -104,6 +98,12 @@ export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] 
                   <td className="px-4 py-3 tabular-nums" style={{ color: '#ec4899' }}>
                     {c.total_opportunities || 0}
                   </td>
+                  <td className="px-4 py-3 tabular-nums" style={{ color: leadsLeft > 0 ? '#f59e0b' : '#6b7280' }}>
+                    {leadsLeft.toLocaleString()}
+                  </td>
+                  <td className="px-4 py-3 tabular-nums" style={{ color: leadsLeftPct > 50 ? '#10b981' : leadsLeftPct > 20 ? '#f59e0b' : '#ef4444' }}>
+                    {leadsLeftPct.toFixed(1)}%
+                  </td>
                 </tr>
               )
             })}
@@ -115,12 +115,6 @@ export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] 
             >
               <td className="px-4 py-3 text-white">Total ({campaigns.length})</td>
               <td className="px-4 py-3"></td>
-              <td className="px-4 py-3 tabular-nums" style={{ color: '#f59e0b' }}>
-                {totalLeadsLeft.toLocaleString()}
-              </td>
-              <td className="px-4 py-3 tabular-nums" style={{ color: totalLeadsLeftPct > 50 ? '#10b981' : totalLeadsLeftPct > 20 ? '#f59e0b' : '#ef4444' }}>
-                {totalLeadsLeftPct.toFixed(1)}%
-              </td>
               <td className="px-4 py-3 tabular-nums text-white">
                 {totals.sent.toLocaleString()}
               </td>
@@ -138,6 +132,12 @@ export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] 
               </td>
               <td className="px-4 py-3 tabular-nums" style={{ color: '#ec4899' }}>
                 {totals.opps}
+              </td>
+              <td className="px-4 py-3 tabular-nums" style={{ color: '#f59e0b' }}>
+                {totalLeadsLeft.toLocaleString()}
+              </td>
+              <td className="px-4 py-3 tabular-nums" style={{ color: totalLeadsLeftPct > 50 ? '#10b981' : totalLeadsLeftPct > 20 ? '#f59e0b' : '#ef4444' }}>
+                {totalLeadsLeftPct.toFixed(1)}%
               </td>
             </tr>
           </tfoot>
