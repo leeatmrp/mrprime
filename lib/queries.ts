@@ -42,6 +42,7 @@ export async function fetchKPIs(supabase: SupabaseClient): Promise<KPIData> {
   const { data: campaigns, error } = await supabase
     .from('campaigns')
     .select('emails_sent_count, reply_count, bounce_count, total_opportunities, status')
+    .eq('status', 1)
 
   if (error) console.error('fetchKPIs error:', error)
   if (!campaigns) {
@@ -56,7 +57,6 @@ export async function fetchKPIs(supabase: SupabaseClient): Promise<KPIData> {
   const totalReplies = campaigns.reduce((sum, c) => sum + (c.reply_count || 0), 0)
   const totalBounces = campaigns.reduce((sum, c) => sum + (c.bounce_count || 0), 0)
   const totalOpportunities = campaigns.reduce((sum, c) => sum + (c.total_opportunities || 0), 0)
-  const activeCampaigns = campaigns.filter(c => c.status === 1).length
 
   return {
     totalSent,
@@ -65,7 +65,7 @@ export async function fetchKPIs(supabase: SupabaseClient): Promise<KPIData> {
     totalBounces,
     bounceRate: totalSent > 0 ? (totalBounces / totalSent) * 100 : 0,
     totalOpportunities,
-    activeCampaigns,
+    activeCampaigns: campaigns.length,
     totalCampaigns: campaigns.length,
   }
 }
