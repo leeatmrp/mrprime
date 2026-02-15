@@ -14,6 +14,24 @@ function bounceColor(rate: number): string {
 }
 
 export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] }) {
+  // Totals for footer
+  const totals = campaigns.reduce(
+    (acc, c) => {
+      acc.leads += c.leads_count || 0
+      acc.contacted += c.contacted_count || 0
+      acc.sent += c.emails_sent_count || 0
+      acc.replies += c.reply_count || 0
+      acc.bounces += c.bounce_count || 0
+      acc.opps += c.total_opportunities || 0
+      return acc
+    },
+    { leads: 0, contacted: 0, sent: 0, replies: 0, bounces: 0, opps: 0 }
+  )
+  const totalLeadsLeft = totals.leads - totals.contacted
+  const totalLeadsLeftPct = totals.leads > 0 ? (totalLeadsLeft / totals.leads) * 100 : 0
+  const totalReplyRate = totals.sent > 0 ? (totals.replies / totals.sent) * 100 : 0
+  const totalBounceRate = totals.sent > 0 ? (totals.bounces / totals.sent) * 100 : 0
+
   return (
     <div
       className="rounded-2xl border overflow-hidden"
@@ -23,7 +41,7 @@ export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] 
         <table className="w-full text-sm">
           <thead>
             <tr style={{ background: '#111827' }}>
-              {['Campaign', 'Status', 'Sent', 'Replies', 'Reply %', 'Bounces', 'Bounce %', 'Opps'].map(h => (
+              {['Campaign', 'Status', 'Leads Left', '% Left', 'Sent', 'Replies', 'Reply %', 'Bounces', 'Bounce %', 'Opps'].map(h => (
                 <th
                   key={h}
                   className="px-4 py-3 text-left font-medium whitespace-nowrap"
@@ -37,6 +55,10 @@ export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] 
           <tbody>
             {campaigns.map((c) => {
               const sent = c.emails_sent_count || 0
+              const leads = c.leads_count || 0
+              const contacted = c.contacted_count || 0
+              const leadsLeft = leads - contacted
+              const leadsLeftPct = leads > 0 ? (leadsLeft / leads) * 100 : 0
               const replyRate = sent > 0 ? (c.reply_count / sent) * 100 : 0
               const bRate = sent > 0 ? (c.bounce_count / sent) * 100 : 0
               const status = statusLabels[c.status] || statusLabels[0]
@@ -57,6 +79,12 @@ export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] 
                     >
                       {status.label}
                     </span>
+                  </td>
+                  <td className="px-4 py-3 tabular-nums" style={{ color: leadsLeft > 0 ? '#f59e0b' : '#6b7280' }}>
+                    {leadsLeft.toLocaleString()}
+                  </td>
+                  <td className="px-4 py-3 tabular-nums" style={{ color: leadsLeftPct > 50 ? '#10b981' : leadsLeftPct > 20 ? '#f59e0b' : '#ef4444' }}>
+                    {leadsLeftPct.toFixed(1)}%
                   </td>
                   <td className="px-4 py-3 text-white tabular-nums">
                     {sent.toLocaleString()}
@@ -80,6 +108,39 @@ export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] 
               )
             })}
           </tbody>
+          <tfoot>
+            <tr
+              className="border-t-2 font-semibold"
+              style={{ background: '#111827', borderColor: '#4b5563' }}
+            >
+              <td className="px-4 py-3 text-white">Total ({campaigns.length})</td>
+              <td className="px-4 py-3"></td>
+              <td className="px-4 py-3 tabular-nums" style={{ color: '#f59e0b' }}>
+                {totalLeadsLeft.toLocaleString()}
+              </td>
+              <td className="px-4 py-3 tabular-nums" style={{ color: totalLeadsLeftPct > 50 ? '#10b981' : totalLeadsLeftPct > 20 ? '#f59e0b' : '#ef4444' }}>
+                {totalLeadsLeftPct.toFixed(1)}%
+              </td>
+              <td className="px-4 py-3 tabular-nums text-white">
+                {totals.sent.toLocaleString()}
+              </td>
+              <td className="px-4 py-3 tabular-nums" style={{ color: '#06b6d4' }}>
+                {totals.replies.toLocaleString()}
+              </td>
+              <td className="px-4 py-3 tabular-nums" style={{ color: '#06b6d4' }}>
+                {totalReplyRate.toFixed(2)}%
+              </td>
+              <td className="px-4 py-3 tabular-nums text-white">
+                {totals.bounces.toLocaleString()}
+              </td>
+              <td className="px-4 py-3 tabular-nums" style={{ color: bounceColor(totalBounceRate) }}>
+                {totalBounceRate.toFixed(2)}%
+              </td>
+              <td className="px-4 py-3 tabular-nums" style={{ color: '#ec4899' }}>
+                {totals.opps}
+              </td>
+            </tr>
+          </tfoot>
         </table>
       </div>
     </div>
