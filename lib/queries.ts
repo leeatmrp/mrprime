@@ -46,21 +46,25 @@ function currentMonthStart(): string {
 export async function fetchKPIs(supabase: SupabaseClient): Promise<KPIData> {
   const dateStr = currentMonthStart()
 
+  // Get active campaign IDs and bounce data
+  const { data: campaigns } = await supabase
+    .from('campaigns')
+    .select('id, bounce_count, emails_sent_count')
+    .eq('status', 1)
+
+  const activeCampaignIds = campaigns?.map(c => c.id) || []
+
+  // Use per-campaign daily data for active campaigns only
   const { data, error } = await supabase
     .from('daily_analytics')
-    .select('sent, unique_replies, opportunities')
+    .select('sent, unique_replies, opportunities, campaign_id')
     .gte('date', dateStr)
-    .is('campaign_id', null)
+    .not('campaign_id', 'is', null)
+    .in('campaign_id', activeCampaignIds)
 
   if (error) console.error('fetchKPIs error:', error)
 
-  // Get active campaign count and all-time bounce data
-  const { data: campaigns } = await supabase
-    .from('campaigns')
-    .select('bounce_count, emails_sent_count')
-    .eq('status', 1)
-
-  if (!data) {
+  if (!data || data.length === 0) {
     return {
       totalSent: 0, totalReplies: 0, replyRate: 0,
       totalBounces: 0, bounceRate: 0, totalOpportunities: 0,
@@ -163,19 +167,23 @@ export async function fetchWeeklyKPIs(supabase: SupabaseClient): Promise<KPIData
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
   const dateStr = sevenDaysAgo.toISOString().split('T')[0]
 
-  const { data } = await supabase
-    .from('daily_analytics')
-    .select('sent, unique_replies, opportunities, campaign_id')
-    .gte('date', dateStr)
-    .is('campaign_id', null)
-
-  // Get bounce data from daily_analytics isn't available, so we use campaigns for active count
+  // Get active campaign IDs
   const { data: campaigns } = await supabase
     .from('campaigns')
-    .select('status')
+    .select('id')
     .eq('status', 1)
 
-  if (!data) {
+  const activeCampaignIds = campaigns?.map(c => c.id) || []
+
+  // Use per-campaign daily data for active campaigns only
+  const { data } = await supabase
+    .from('daily_analytics')
+    .select('sent, unique_replies, opportunities')
+    .gte('date', dateStr)
+    .not('campaign_id', 'is', null)
+    .in('campaign_id', activeCampaignIds)
+
+  if (!data || data.length === 0) {
     return {
       totalSent: 0, totalReplies: 0, replyRate: 0,
       totalBounces: 0, bounceRate: 0, totalOpportunities: 0,
