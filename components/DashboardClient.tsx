@@ -85,7 +85,7 @@ export default function DashboardClient({
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <KPICard
-            title="Emails Sent"
+            title="Leads Contacted"
             value={kpis.totalSent.toLocaleString()}
             color="orange"
             subtext={`${kpis.totalCampaigns} campaigns`}

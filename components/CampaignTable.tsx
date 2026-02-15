@@ -41,7 +41,7 @@ export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] 
         <table className="w-full text-sm">
           <thead>
             <tr style={{ background: '#111827' }}>
-              {['Campaign', 'Status', 'Sent', 'Replies', 'Reply %', 'Bounces', 'Bounce %', 'Opps', 'Leads Left', '% Left'].map(h => (
+              {['Campaign', 'Status', 'Contacted', 'Replies', 'Reply %', 'Bounces', 'Bounce %', 'Opps', 'Leads Left', '% Left'].map(h => (
                 <th
                   key={h}
                   className="px-4 py-3 text-left font-medium whitespace-nowrap"

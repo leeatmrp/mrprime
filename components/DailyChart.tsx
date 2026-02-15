@@ -26,7 +26,7 @@ export default function DailyChart({ data }: { data: DailyDataPoint[] }) {
     labels,
     datasets: [
       {
-        label: 'Emails Sent',
+        label: 'Leads Contacted',
         data: data.map(d => d.sent),
         borderColor: '#f97316',
         backgroundColor: 'rgba(249, 115, 22, 0.1)',
@@ -89,7 +89,7 @@ export default function DailyChart({ data }: { data: DailyDataPoint[] }) {
         type: 'linear' as const,
         display: true,
         position: 'left' as const,
-        title: { display: true, text: 'Emails Sent', color: '#f97316' },
+        title: { display: true, text: 'Leads Contacted', color: '#f97316' },
         ticks: { color: '#6b7280' },
         grid: { color: 'rgba(55, 65, 81, 0.3)' },
       },
