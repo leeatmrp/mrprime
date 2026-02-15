@@ -6,7 +6,7 @@ const INSTANTLY_KEY = process.env.INSTANTLY_API_KEY!
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-export async function POST() {
+export async function GET() {
   try {
     const res = await fetch(`${INSTANTLY_API}/campaigns/analytics`, {
       headers: {
