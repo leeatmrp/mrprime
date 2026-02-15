@@ -24,7 +24,7 @@ async function fetchInstantly(path: string) {
 }
 
 async function syncCampaigns(supabase: Supabase) {
-  const analytics = await fetchInstantly('/analytics/campaign/summary')
+  const analytics = await fetchInstantly('/campaigns/analytics')
   if (!analytics || !Array.isArray(analytics)) return { synced: 0 }
 
   const rows = analytics.map((c: Record<string, number | string>) => ({
@@ -94,7 +94,7 @@ async function syncDailyAnalytics(supabase: Supabase) {
 
   // 1. Aggregate daily analytics
   const aggData = await fetchInstantly(
-    `/analytics/campaign/daily?start_date=${startDate}&end_date=${endDate}`
+    `/campaigns/analytics/daily?start_date=${startDate}&end_date=${endDate}`
   )
 
   let aggDays = 0
@@ -136,7 +136,7 @@ async function syncDailyAnalytics(supabase: Supabase) {
   if (activeCampaigns) {
     for (const campaign of activeCampaigns) {
       const campData = await fetchInstantly(
-        `/analytics/campaign/daily?campaign_id=${campaign.id}&start_date=${startDate}&end_date=${endDate}`
+        `/campaigns/analytics/daily?campaign_id=${campaign.id}&start_date=${startDate}&end_date=${endDate}`
       )
 
       if (Array.isArray(campData)) {
