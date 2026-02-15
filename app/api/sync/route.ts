@@ -245,7 +245,6 @@ export async function GET(request: Request) {
 
     const result = {
       ok: true,
-      version: 2,
       timestamp: new Date().toISOString(),
       campaigns,
       accounts,
