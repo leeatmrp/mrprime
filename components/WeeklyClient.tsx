@@ -31,6 +31,8 @@ export default function WeeklyClient({
 
   const refresh = useCallback(async () => {
     setLoading(true)
+    // Pull live campaign totals from Instantly first
+    try { await fetch('/api/refresh', { method: 'POST' }) } catch {}
     const supabase = createClient()
     const [k, c, d, w] = await Promise.all([
       fetchWeeklyKPIs(supabase),
