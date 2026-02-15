@@ -169,7 +169,63 @@ async function syncDailyAnalytics(supabase: Supabase) {
     }
   }
 
-  return { aggregateDays: aggDays, campaigns: activeCampaigns?.length || 0 }
+  // 3. Reconcile opportunities against campaign analytics (source of truth)
+  let oppsFixed = 0
+  if (activeCampaigns) {
+    const monthStart = new Date()
+    monthStart.setDate(1)
+    const monthStartStr = monthStart.toISOString().split('T')[0]
+
+    const campAnalytics = await fetchInstantly(
+      `/campaigns/analytics?start_date=${monthStartStr}&end_date=${endDate}`
+    )
+
+    if (Array.isArray(campAnalytics)) {
+      for (const camp of campAnalytics) {
+        if (camp.campaign_status !== 1) continue
+        const campaignId = camp.campaign_id as string
+        const apiOpps = (camp.total_opportunities as number) || 0
+
+        // Sum daily opps for this campaign this month
+        const { data: dailyRows } = await supabase
+          .from('daily_analytics')
+          .select('date, opportunities')
+          .eq('campaign_id', campaignId)
+          .gte('date', monthStartStr)
+
+        const sumDailyOpps = dailyRows?.reduce(
+          (s: number, r: { opportunities: number }) => s + (r.opportunities || 0), 0
+        ) || 0
+
+        if (sumDailyOpps !== apiOpps) {
+          // Zero out all daily opps for this campaign
+          await supabase
+            .from('daily_analytics')
+            .update({ opportunities: 0, unique_opportunities: 0 })
+            .eq('campaign_id', campaignId)
+            .gte('date', monthStartStr)
+
+          // Set correct total on the most recent date
+          if (apiOpps > 0 && dailyRows?.length) {
+            const latestDate = dailyRows
+              .map((r: { date: string }) => r.date)
+              .sort()
+              .pop()
+            if (latestDate) {
+              await supabase
+                .from('daily_analytics')
+                .update({ opportunities: apiOpps, unique_opportunities: apiOpps })
+                .eq('campaign_id', campaignId)
+                .eq('date', latestDate)
+            }
+          }
+          oppsFixed++
+        }
+      }
+    }
+  }
+
+  return { aggregateDays: aggDays, campaigns: activeCampaigns?.length || 0, oppsFixed }
 }
 
 export async function GET(request: Request) {
