@@ -74,6 +74,7 @@ export async function fetchCampaigns(supabase: SupabaseClient): Promise<Campaign
   const { data } = await supabase
     .from('campaigns')
     .select('id, name, status, emails_sent_count, reply_count, bounce_count, total_opportunities, leads_count, contacted_count, open_count')
+    .eq('status', 1)
     .order('emails_sent_count', { ascending: false })
 
   return data || []
