@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { fetchWeeklyKPIs, fetchCampaigns, fetchDailyAnalytics, fetchWarmupHealth } from '@/lib/queries'
+import { fetchWeeklyKPIs, fetchWeeklyCampaigns, fetchDailyAnalytics, fetchWarmupHealth } from '@/lib/queries'
 import type { KPIData, CampaignRow, DailyDataPoint, WarmupHealth } from '@/lib/queries'
 import KPICard from './KPICard'
 import CampaignTable from './CampaignTable'
@@ -34,7 +34,7 @@ export default function WeeklyClient({
     const supabase = createClient()
     const [k, c, d, w] = await Promise.all([
       fetchWeeklyKPIs(supabase),
-      fetchCampaigns(supabase),
+      fetchWeeklyCampaigns(supabase),
       fetchDailyAnalytics(supabase, 7),
       fetchWarmupHealth(supabase),
     ])

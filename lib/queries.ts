@@ -120,6 +120,57 @@ export async function fetchWeeklyKPIs(supabase: SupabaseClient): Promise<KPIData
   }
 }
 
+export async function fetchWeeklyCampaigns(supabase: SupabaseClient): Promise<CampaignRow[]> {
+  const sevenDaysAgo = new Date()
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+  const dateStr = sevenDaysAgo.toISOString().split('T')[0]
+
+  // Get last 7 days of daily_analytics per campaign
+  const { data: dailyData } = await supabase
+    .from('daily_analytics')
+    .select('campaign_id, sent, unique_replies, opportunities')
+    .gte('date', dateStr)
+
+  // Get campaign metadata (name, status, leads)
+  const { data: campaigns } = await supabase
+    .from('campaigns')
+    .select('id, name, status, leads_count, contacted_count')
+    .eq('status', 1)
+
+  if (!dailyData || !campaigns) return []
+
+  // Aggregate daily data by campaign
+  const weeklyByCampaign: Record<string, { sent: number; replies: number; opps: number }> = {}
+  for (const row of dailyData) {
+    if (!weeklyByCampaign[row.campaign_id]) {
+      weeklyByCampaign[row.campaign_id] = { sent: 0, replies: 0, opps: 0 }
+    }
+    weeklyByCampaign[row.campaign_id].sent += row.sent || 0
+    weeklyByCampaign[row.campaign_id].replies += row.unique_replies || 0
+    weeklyByCampaign[row.campaign_id].opps += row.opportunities || 0
+  }
+
+  // Merge with campaign info
+  return campaigns
+    .map(c => {
+      const weekly = weeklyByCampaign[c.id] || { sent: 0, replies: 0, opps: 0 }
+      return {
+        id: c.id,
+        name: c.name,
+        status: c.status,
+        emails_sent_count: weekly.sent,
+        reply_count: weekly.replies,
+        bounce_count: 0,
+        total_opportunities: weekly.opps,
+        leads_count: c.leads_count || 0,
+        contacted_count: c.contacted_count || 0,
+        open_count: 0,
+      }
+    })
+    .filter(c => c.emails_sent_count > 0)
+    .sort((a, b) => b.emails_sent_count - a.emails_sent_count)
+}
+
 export async function fetchDailyAnalytics(supabase: SupabaseClient, days: number = 30): Promise<DailyDataPoint[]> {
   const daysAgo = new Date()
   daysAgo.setDate(daysAgo.getDate() - days)

@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { fetchWeeklyKPIs, fetchCampaigns, fetchDailyAnalytics, fetchWarmupHealth } from '@/lib/queries'
+import { fetchWeeklyKPIs, fetchWeeklyCampaigns, fetchDailyAnalytics, fetchWarmupHealth } from '@/lib/queries'
 import WeeklyClient from '@/components/WeeklyClient'
 
 export const dynamic = 'force-dynamic'
@@ -10,7 +10,7 @@ export default async function WeeklyPage() {
   try {
     const [kpis, campaigns, daily, warmup] = await Promise.all([
       fetchWeeklyKPIs(supabase),
-      fetchCampaigns(supabase),
+      fetchWeeklyCampaigns(supabase),
       fetchDailyAnalytics(supabase, 7),
       fetchWarmupHealth(supabase),
     ])
