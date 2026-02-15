@@ -55,7 +55,7 @@ export default function DashboardClient({
     <div className="space-y-6">
       {/* Header row */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">Overview</h1>
+        <h1 className="text-2xl font-bold text-white">Monthly Overview</h1>
         <div className="flex items-center gap-3">
           <span className="text-xs" style={{ color: '#6b7280' }}>
             Last updated: {lastRefresh.toLocaleTimeString('en-GB')}
