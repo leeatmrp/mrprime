@@ -13,6 +13,12 @@ function bounceColor(rate: number): string {
   return '#ef4444'
 }
 
+function progressColor(pct: number): string {
+  if (pct >= 100) return '#3b82f6'  // blue = fully worked
+  if (pct >= 80) return '#f59e0b'   // yellow = running low
+  return '#10b981'                   // green = plenty left
+}
+
 export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] }) {
   // Totals for footer
   const totals = campaigns.reduce(
@@ -27,8 +33,7 @@ export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] 
     },
     { leads: 0, contacted: 0, sent: 0, replies: 0, bounces: 0, opps: 0 }
   )
-  const totalLeadsLeft = Math.max(totals.leads - totals.contacted, 0)
-  const totalProgressPct = totals.leads > 0 ? Math.min((totals.contacted / totals.leads) * 100, 100) : 0
+  const totalCompletedPct = totals.leads > 0 ? Math.min((totals.contacted / totals.leads) * 100, 100) : 0
   const totalReplyRate = totals.sent > 0 ? (totals.replies / totals.sent) * 100 : 0
   const totalBounceRate = totals.sent > 0 ? (totals.bounces / totals.sent) * 100 : 0
 
@@ -41,7 +46,7 @@ export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] 
         <table className="w-full text-sm">
           <thead>
             <tr style={{ background: '#111827' }}>
-              {['Campaign', 'Status', 'Contacted', 'Replies', 'Reply %', 'Bounces', 'Bounce %', 'Opps', 'Leads Left', 'Progress'].map(h => (
+              {['Campaign', 'Status', 'Contacted', 'Replies', 'Reply %', 'Bounces', 'Bounce %', 'Opps', 'Total Leads', 'Completed', '% of Total'].map(h => (
                 <th
                   key={h}
                   className="px-4 py-3 text-left font-medium whitespace-nowrap"
@@ -56,9 +61,8 @@ export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] 
             {campaigns.map((c) => {
               const sent = c.emails_sent_count || 0
               const leads = c.leads_count || 0
-              const contacted = c.contacted_count || 0
-              const leadsLeft = Math.max(leads - contacted, 0)
-              const progressPct = leads > 0 ? Math.min((contacted / leads) * 100, 100) : 0
+              const completed = c.contacted_count || 0
+              const completedPct = leads > 0 ? Math.min((completed / leads) * 100, 100) : 0
               const replyRate = sent > 0 ? (c.reply_count / sent) * 100 : 0
               const bRate = sent > 0 ? (c.bounce_count / sent) * 100 : 0
               const status = statusLabels[c.status] || statusLabels[0]
@@ -98,11 +102,27 @@ export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] 
                   <td className="px-4 py-3 tabular-nums" style={{ color: '#ec4899' }}>
                     {c.total_opportunities || 0}
                   </td>
-                  <td className="px-4 py-3 tabular-nums" style={{ color: leadsLeft > 0 ? '#f59e0b' : '#6b7280' }}>
-                    {leadsLeft.toLocaleString()}
+                  <td className="px-4 py-3 tabular-nums" style={{ color: '#94a3b8' }}>
+                    {leads.toLocaleString()}
                   </td>
-                  <td className="px-4 py-3 tabular-nums" style={{ color: progressPct > 80 ? '#ef4444' : progressPct > 50 ? '#f59e0b' : '#10b981' }}>
-                    {progressPct.toFixed(1)}%
+                  <td className="px-4 py-3 tabular-nums text-white">
+                    {completed.toLocaleString()}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: '#374151', minWidth: '48px' }}>
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{
+                            width: `${completedPct}%`,
+                            background: progressColor(completedPct),
+                          }}
+                        />
+                      </div>
+                      <span className="tabular-nums text-xs whitespace-nowrap" style={{ color: progressColor(completedPct) }}>
+                        {completedPct.toFixed(0)}%
+                      </span>
+                    </div>
                   </td>
                 </tr>
               )
@@ -133,11 +153,27 @@ export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] 
               <td className="px-4 py-3 tabular-nums" style={{ color: '#ec4899' }}>
                 {totals.opps}
               </td>
-              <td className="px-4 py-3 tabular-nums" style={{ color: '#f59e0b' }}>
-                {totalLeadsLeft.toLocaleString()}
+              <td className="px-4 py-3 tabular-nums" style={{ color: '#94a3b8' }}>
+                {totals.leads.toLocaleString()}
               </td>
-              <td className="px-4 py-3 tabular-nums" style={{ color: totalProgressPct > 80 ? '#ef4444' : totalProgressPct > 50 ? '#f59e0b' : '#10b981' }}>
-                {totalProgressPct.toFixed(1)}%
+              <td className="px-4 py-3 tabular-nums text-white">
+                {totals.contacted.toLocaleString()}
+              </td>
+              <td className="px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: '#374151', minWidth: '48px' }}>
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{
+                        width: `${totalCompletedPct}%`,
+                        background: progressColor(totalCompletedPct),
+                      }}
+                    />
+                  </div>
+                  <span className="tabular-nums text-xs whitespace-nowrap" style={{ color: progressColor(totalCompletedPct) }}>
+                    {totalCompletedPct.toFixed(0)}%
+                  </span>
+                </div>
               </td>
             </tr>
           </tfoot>
