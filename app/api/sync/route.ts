@@ -87,9 +87,9 @@ async function syncAccounts(supabase: Supabase) {
 }
 
 async function syncDailyAnalytics(supabase: Supabase) {
-  const twoDaysAgo = new Date()
-  twoDaysAgo.setDate(twoDaysAgo.getDate() - 2)
-  const startDate = twoDaysAgo.toISOString().split('T')[0]
+  const windowStart = new Date()
+  windowStart.setDate(windowStart.getDate() - 31)
+  const startDate = windowStart.toISOString().split('T')[0]
   const endDate = new Date().toISOString().split('T')[0]
 
   // 1. Aggregate daily analytics

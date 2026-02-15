@@ -39,45 +39,122 @@ export interface WarmupHealth {
 }
 
 export async function fetchKPIs(supabase: SupabaseClient): Promise<KPIData> {
-  const { data: campaigns, error } = await supabase
-    .from('campaigns')
-    .select('emails_sent_count, reply_count, bounce_count, total_opportunities, status')
-    .eq('status', 1)
+  const thirtyDaysAgo = new Date()
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+  const dateStr = thirtyDaysAgo.toISOString().split('T')[0]
+
+  const { data, error } = await supabase
+    .from('daily_analytics')
+    .select('sent, unique_replies, opportunities')
+    .gte('date', dateStr)
+    .is('campaign_id', null)
 
   if (error) console.error('fetchKPIs error:', error)
-  if (!campaigns) {
+
+  // Get active campaign count and all-time bounce data
+  const { data: campaigns } = await supabase
+    .from('campaigns')
+    .select('bounce_count, emails_sent_count')
+    .eq('status', 1)
+
+  if (!data) {
     return {
       totalSent: 0, totalReplies: 0, replyRate: 0,
       totalBounces: 0, bounceRate: 0, totalOpportunities: 0,
-      activeCampaigns: 0, totalCampaigns: 0,
+      activeCampaigns: campaigns?.length || 0, totalCampaigns: campaigns?.length || 0,
     }
   }
 
-  const totalSent = campaigns.reduce((sum, c) => sum + (c.emails_sent_count || 0), 0)
-  const totalReplies = campaigns.reduce((sum, c) => sum + (c.reply_count || 0), 0)
-  const totalBounces = campaigns.reduce((sum, c) => sum + (c.bounce_count || 0), 0)
-  const totalOpportunities = campaigns.reduce((sum, c) => sum + (c.total_opportunities || 0), 0)
+  const totalSent = data.reduce((sum, r) => sum + (r.sent || 0), 0)
+  const totalReplies = data.reduce((sum, r) => sum + (r.unique_replies || 0), 0)
+  const totalOpportunities = data.reduce((sum, r) => sum + (r.opportunities || 0), 0)
+
+  // Bounces aren't tracked in daily_analytics — use all-time from campaigns table
+  const totalBounces = campaigns?.reduce((sum, c) => sum + (c.bounce_count || 0), 0) || 0
+  const allTimeSent = campaigns?.reduce((sum, c) => sum + (c.emails_sent_count || 0), 0) || 0
 
   return {
     totalSent,
     totalReplies,
     replyRate: totalSent > 0 ? (totalReplies / totalSent) * 100 : 0,
     totalBounces,
-    bounceRate: totalSent > 0 ? (totalBounces / totalSent) * 100 : 0,
+    bounceRate: allTimeSent > 0 ? (totalBounces / allTimeSent) * 100 : 0,
     totalOpportunities,
-    activeCampaigns: campaigns.length,
-    totalCampaigns: campaigns.length,
+    activeCampaigns: campaigns?.length || 0,
+    totalCampaigns: campaigns?.length || 0,
   }
 }
 
 export async function fetchCampaigns(supabase: SupabaseClient): Promise<CampaignRow[]> {
-  const { data } = await supabase
+  const thirtyDaysAgo = new Date()
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+  const dateStr = thirtyDaysAgo.toISOString().split('T')[0]
+
+  // Get last 30 days of daily_analytics per campaign
+  const { data: dailyData } = await supabase
+    .from('daily_analytics')
+    .select('campaign_id, sent, unique_replies, opportunities')
+    .gte('date', dateStr)
+    .not('campaign_id', 'is', null)
+
+  // Get campaign metadata
+  const { data: campaigns } = await supabase
     .from('campaigns')
     .select('id, name, status, emails_sent_count, reply_count, bounce_count, total_opportunities, leads_count, contacted_count, open_count')
     .eq('status', 1)
-    .order('emails_sent_count', { ascending: false })
 
-  return data || []
+  if (!campaigns) return []
+
+  const hasPerCampaignData = dailyData?.some(r => r.campaign_id != null) || false
+
+  if (hasPerCampaignData && dailyData) {
+    const monthlyByCampaign: Record<string, { sent: number; replies: number; opps: number }> = {}
+    for (const row of dailyData) {
+      if (!row.campaign_id) continue
+      if (!monthlyByCampaign[row.campaign_id]) {
+        monthlyByCampaign[row.campaign_id] = { sent: 0, replies: 0, opps: 0 }
+      }
+      monthlyByCampaign[row.campaign_id].sent += row.sent || 0
+      monthlyByCampaign[row.campaign_id].replies += row.unique_replies || 0
+      monthlyByCampaign[row.campaign_id].opps += row.opportunities || 0
+    }
+
+    return campaigns
+      .map(c => {
+        const monthly = monthlyByCampaign[c.id] || { sent: 0, replies: 0, opps: 0 }
+        return {
+          id: c.id,
+          name: c.name,
+          status: c.status,
+          emails_sent_count: monthly.sent,
+          reply_count: monthly.replies,
+          bounce_count: 0,
+          total_opportunities: monthly.opps,
+          leads_count: c.leads_count || 0,
+          contacted_count: c.contacted_count || 0,
+          open_count: 0,
+        }
+      })
+      .filter(c => c.emails_sent_count > 0)
+      .sort((a, b) => b.emails_sent_count - a.emails_sent_count)
+  }
+
+  // Fallback: no per-campaign daily data, show all-time
+  return campaigns
+    .map(c => ({
+      id: c.id,
+      name: c.name,
+      status: c.status,
+      emails_sent_count: c.emails_sent_count || 0,
+      reply_count: c.reply_count || 0,
+      bounce_count: c.bounce_count || 0,
+      total_opportunities: c.total_opportunities || 0,
+      leads_count: c.leads_count || 0,
+      contacted_count: c.contacted_count || 0,
+      open_count: c.open_count || 0,
+    }))
+    .filter(c => c.emails_sent_count > 0)
+    .sort((a, b) => b.emails_sent_count - a.emails_sent_count)
 }
 
 export async function fetchWeeklyKPIs(supabase: SupabaseClient): Promise<KPIData> {
