@@ -38,10 +38,13 @@ export interface WarmupHealth {
   avgScore: number
 }
 
+function currentMonthStart(): string {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+}
+
 export async function fetchKPIs(supabase: SupabaseClient): Promise<KPIData> {
-  const thirtyDaysAgo = new Date()
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-  const dateStr = thirtyDaysAgo.toISOString().split('T')[0]
+  const dateStr = currentMonthStart()
 
   const { data, error } = await supabase
     .from('daily_analytics')
@@ -86,11 +89,9 @@ export async function fetchKPIs(supabase: SupabaseClient): Promise<KPIData> {
 }
 
 export async function fetchCampaigns(supabase: SupabaseClient): Promise<CampaignRow[]> {
-  const thirtyDaysAgo = new Date()
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-  const dateStr = thirtyDaysAgo.toISOString().split('T')[0]
+  const dateStr = currentMonthStart()
 
-  // Get last 30 days of daily_analytics per campaign
+  // Get current calendar month daily_analytics per campaign
   const { data: dailyData } = await supabase
     .from('daily_analytics')
     .select('campaign_id, sent, unique_replies, opportunities')
@@ -272,10 +273,15 @@ export async function fetchWeeklyCampaigns(supabase: SupabaseClient): Promise<Ca
     .sort((a, b) => b.emails_sent_count - a.emails_sent_count)
 }
 
-export async function fetchDailyAnalytics(supabase: SupabaseClient, days: number = 30): Promise<DailyDataPoint[]> {
-  const daysAgo = new Date()
-  daysAgo.setDate(daysAgo.getDate() - days)
-  const dateStr = daysAgo.toISOString().split('T')[0]
+export async function fetchDailyAnalytics(supabase: SupabaseClient, days: number = 0): Promise<DailyDataPoint[]> {
+  let dateStr: string
+  if (days > 0) {
+    const daysAgo = new Date()
+    daysAgo.setDate(daysAgo.getDate() - days)
+    dateStr = daysAgo.toISOString().split('T')[0]
+  } else {
+    dateStr = currentMonthStart()
+  }
 
   const { data } = await supabase
     .from('daily_analytics')
