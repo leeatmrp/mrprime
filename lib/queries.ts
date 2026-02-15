@@ -89,6 +89,7 @@ export async function fetchWeeklyKPIs(supabase: SupabaseClient): Promise<KPIData
     .from('daily_analytics')
     .select('sent, unique_replies, opportunities, campaign_id')
     .gte('date', dateStr)
+    .is('campaign_id', null)
 
   // Get bounce data from daily_analytics isn't available, so we use campaigns for active count
   const { data: campaigns } = await supabase
@@ -125,11 +126,12 @@ export async function fetchWeeklyCampaigns(supabase: SupabaseClient): Promise<Ca
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
   const dateStr = sevenDaysAgo.toISOString().split('T')[0]
 
-  // Get last 7 days of daily_analytics per campaign
+  // Get last 7 days of daily_analytics per campaign (only rows with campaign_id)
   const { data: dailyData } = await supabase
     .from('daily_analytics')
     .select('campaign_id, sent, unique_replies, opportunities')
     .gte('date', dateStr)
+    .not('campaign_id', 'is', null)
 
   // Get campaign metadata (name, status, leads)
   const { data: campaigns } = await supabase
@@ -202,6 +204,7 @@ export async function fetchDailyAnalytics(supabase: SupabaseClient, days: number
     .from('daily_analytics')
     .select('date, sent, unique_replies, opportunities')
     .gte('date', dateStr)
+    .is('campaign_id', null)
     .order('date', { ascending: true })
 
   if (!data) return []
