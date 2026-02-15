@@ -28,7 +28,7 @@ export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] 
     { leads: 0, contacted: 0, sent: 0, replies: 0, bounces: 0, opps: 0 }
   )
   const totalLeadsLeft = totals.leads - totals.contacted
-  const totalLeadsLeftPct = totals.leads > 0 ? (totalLeadsLeft / totals.leads) * 100 : 0
+  const totalProgressPct = totals.leads > 0 ? (totals.contacted / totals.leads) * 100 : 0
   const totalReplyRate = totals.sent > 0 ? (totals.replies / totals.sent) * 100 : 0
   const totalBounceRate = totals.sent > 0 ? (totals.bounces / totals.sent) * 100 : 0
 
@@ -41,7 +41,7 @@ export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] 
         <table className="w-full text-sm">
           <thead>
             <tr style={{ background: '#111827' }}>
-              {['Campaign', 'Status', 'Contacted', 'Replies', 'Reply %', 'Bounces', 'Bounce %', 'Opps', 'Leads Left', '% Left'].map(h => (
+              {['Campaign', 'Status', 'Contacted', 'Replies', 'Reply %', 'Bounces', 'Bounce %', 'Opps', 'Leads Left', 'Progress'].map(h => (
                 <th
                   key={h}
                   className="px-4 py-3 text-left font-medium whitespace-nowrap"
@@ -58,7 +58,7 @@ export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] 
               const leads = c.leads_count || 0
               const contacted = c.contacted_count || 0
               const leadsLeft = leads - contacted
-              const leadsLeftPct = leads > 0 ? (leadsLeft / leads) * 100 : 0
+              const progressPct = leads > 0 ? (contacted / leads) * 100 : 0
               const replyRate = sent > 0 ? (c.reply_count / sent) * 100 : 0
               const bRate = sent > 0 ? (c.bounce_count / sent) * 100 : 0
               const status = statusLabels[c.status] || statusLabels[0]
@@ -101,8 +101,8 @@ export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] 
                   <td className="px-4 py-3 tabular-nums" style={{ color: leadsLeft > 0 ? '#f59e0b' : '#6b7280' }}>
                     {leadsLeft.toLocaleString()}
                   </td>
-                  <td className="px-4 py-3 tabular-nums" style={{ color: leadsLeftPct > 50 ? '#10b981' : leadsLeftPct > 20 ? '#f59e0b' : '#ef4444' }}>
-                    {leadsLeftPct.toFixed(1)}%
+                  <td className="px-4 py-3 tabular-nums" style={{ color: progressPct > 80 ? '#ef4444' : progressPct > 50 ? '#f59e0b' : '#10b981' }}>
+                    {progressPct.toFixed(1)}%
                   </td>
                 </tr>
               )
@@ -136,8 +136,8 @@ export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] 
               <td className="px-4 py-3 tabular-nums" style={{ color: '#f59e0b' }}>
                 {totalLeadsLeft.toLocaleString()}
               </td>
-              <td className="px-4 py-3 tabular-nums" style={{ color: totalLeadsLeftPct > 50 ? '#10b981' : totalLeadsLeftPct > 20 ? '#f59e0b' : '#ef4444' }}>
-                {totalLeadsLeftPct.toFixed(1)}%
+              <td className="px-4 py-3 tabular-nums" style={{ color: totalProgressPct > 80 ? '#ef4444' : totalProgressPct > 50 ? '#f59e0b' : '#10b981' }}>
+                {totalProgressPct.toFixed(1)}%
               </td>
             </tr>
           </tfoot>
