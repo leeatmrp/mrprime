@@ -80,10 +80,50 @@ export async function fetchCampaigns(supabase: SupabaseClient): Promise<Campaign
   return data || []
 }
 
-export async function fetchDailyAnalytics(supabase: SupabaseClient): Promise<DailyDataPoint[]> {
-  const thirtyDaysAgo = new Date()
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-  const dateStr = thirtyDaysAgo.toISOString().split('T')[0]
+export async function fetchWeeklyKPIs(supabase: SupabaseClient): Promise<KPIData> {
+  const sevenDaysAgo = new Date()
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+  const dateStr = sevenDaysAgo.toISOString().split('T')[0]
+
+  const { data } = await supabase
+    .from('daily_analytics')
+    .select('sent, unique_replies, opportunities, campaign_id')
+    .gte('date', dateStr)
+
+  // Get bounce data from daily_analytics isn't available, so we use campaigns for active count
+  const { data: campaigns } = await supabase
+    .from('campaigns')
+    .select('status')
+    .eq('status', 1)
+
+  if (!data) {
+    return {
+      totalSent: 0, totalReplies: 0, replyRate: 0,
+      totalBounces: 0, bounceRate: 0, totalOpportunities: 0,
+      activeCampaigns: campaigns?.length || 0, totalCampaigns: campaigns?.length || 0,
+    }
+  }
+
+  const totalSent = data.reduce((sum, r) => sum + (r.sent || 0), 0)
+  const totalReplies = data.reduce((sum, r) => sum + (r.unique_replies || 0), 0)
+  const totalOpportunities = data.reduce((sum, r) => sum + (r.opportunities || 0), 0)
+
+  return {
+    totalSent,
+    totalReplies,
+    replyRate: totalSent > 0 ? (totalReplies / totalSent) * 100 : 0,
+    totalBounces: 0,
+    bounceRate: 0,
+    totalOpportunities,
+    activeCampaigns: campaigns?.length || 0,
+    totalCampaigns: campaigns?.length || 0,
+  }
+}
+
+export async function fetchDailyAnalytics(supabase: SupabaseClient, days: number = 30): Promise<DailyDataPoint[]> {
+  const daysAgo = new Date()
+  daysAgo.setDate(daysAgo.getDate() - days)
+  const dateStr = daysAgo.toISOString().split('T')[0]
 
   const { data } = await supabase
     .from('daily_analytics')

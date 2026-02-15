@@ -112,7 +112,7 @@ export default function DailyChart({ data }: { data: DailyDataPoint[] }) {
         borderColor: '#374151',
       }}
     >
-      <h3 className="text-lg font-semibold text-white mb-4">Daily Performance (Last 30 Days)</h3>
+      <h3 className="text-lg font-semibold text-white mb-4">Daily Performance (Last {data.length} Days)</h3>
       <div style={{ height: 300 }}>
         <Line data={chartData} options={options} />
       </div>
