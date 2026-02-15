@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 
@@ -7,11 +7,20 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const cookieStore = await cookies()
+  const token = cookieStore.get('sb-access-token')?.value
 
-  if (!user) {
+  if (!token) {
     redirect('/login')
+  }
+
+  // Decode the JWT to get the email (payload is the second segment)
+  let email = 'User'
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    email = payload.email || 'User'
+  } catch {
+    // ignore decode errors
   }
 
   return (
@@ -33,7 +42,7 @@ export default async function DashboardLayout({
         </div>
         <div className="flex items-center gap-4">
           <span className="text-xs" style={{ color: '#6b7280' }}>
-            {user.email}
+            {email}
           </span>
           <form action="/api/auth/signout" method="POST">
             <button

@@ -1,8 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -17,19 +19,42 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      const supabase = createClient()
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_KEY,
+        },
+        body: JSON.stringify({ email, password }),
       })
 
-      if (error) {
-        setError(error.message)
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.msg || data.error_description || 'Login failed')
         setLoading(false)
-      } else {
-        router.push('/dashboard')
-        router.refresh()
+        return
       }
+
+      // Store the session tokens
+      if (data.access_token) {
+        document.cookie = `sb-access-token=${data.access_token}; path=/; max-age=3600; SameSite=Lax`
+        document.cookie = `sb-refresh-token=${data.refresh_token}; path=/; max-age=604800; SameSite=Lax`
+
+        // Also store for Supabase client to pick up
+        const storageKey = `sb-${new URL(SUPABASE_URL).hostname.split('.')[0]}-auth-token`
+        localStorage.setItem(storageKey, JSON.stringify({
+          access_token: data.access_token,
+          refresh_token: data.refresh_token,
+          token_type: data.token_type,
+          expires_in: data.expires_in,
+          expires_at: data.expires_at,
+          user: data.user,
+        }))
+      }
+
+      router.push('/dashboard')
+      router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed')
       setLoading(false)

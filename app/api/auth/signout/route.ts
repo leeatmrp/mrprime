@@ -1,8 +1,9 @@
-import { createClient } from '@/lib/supabase/server'
+import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 
 export async function POST() {
-  const supabase = await createClient()
-  await supabase.auth.signOut()
+  const cookieStore = await cookies()
+  cookieStore.delete('sb-access-token')
+  cookieStore.delete('sb-refresh-token')
   redirect('/login')
 }
