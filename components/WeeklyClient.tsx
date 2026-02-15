@@ -82,18 +82,18 @@ export default function WeeklyClient({
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           <KPICard
-            title="Emails Sent (7d)"
+            title="Emails Sent"
             value={kpis.totalSent.toLocaleString()}
             color="orange"
           />
           <KPICard
-            title="Reply Rate (7d)"
+            title="Reply Rate"
             value={`${kpis.replyRate.toFixed(2)}%`}
             color="cyan"
             subtext={`${kpis.totalReplies.toLocaleString()} replies`}
           />
           <KPICard
-            title="Opportunities (7d)"
+            title="Opportunities"
             value={kpis.totalOpportunities.toLocaleString()}
             color="pink"
           />
