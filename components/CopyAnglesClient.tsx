@@ -12,12 +12,13 @@ function pct(n: number): string {
 }
 
 // unique_replies = human replies, unique_replies_automatic = auto replies (independent counts)
-// ARR = auto / human — no subtraction, these are separate lead pools
+// ARR = auto / human — list quality + deliverability risk
+// High ratio = dead/catch-all mailboxes → low human reply rate → ESPs flag as spam
 function arrColor(autoReplies: number, humanReplies: number): string {
   if (humanReplies === 0 || autoReplies === 0) return '#94a3b8' // grey — no data
   const ratio = autoReplies / humanReplies
-  if (ratio >= 3) return '#ef4444'   // red — danger
-  if (ratio >= 2) return '#f97316'   // orange — warning
+  if (ratio >= 3) return '#ef4444'   // red — poor list, deliverability risk
+  if (ratio >= 2) return '#f97316'   // orange — check list quality
   return '#22c55e'                    // green — healthy
 }
 
@@ -106,7 +107,7 @@ export default function CopyAnglesClient({ data }: { data: CopyAngleRow[] }) {
               <th className="text-right px-4 py-3 font-semibold" style={{ color: '#94a3b8' }}>Prospects</th>
               <th className="text-right px-4 py-3 font-semibold" style={{ color: '#94a3b8' }}>Replies</th>
               <th className="text-right px-4 py-3 font-semibold" style={{ color: '#94a3b8' }}>Reply Rate</th>
-              <th className="text-right px-4 py-3 font-semibold" style={{ color: '#94a3b8' }}>ARR</th>
+              <th className="text-right px-4 py-3 font-semibold" style={{ color: '#94a3b8' }} title="Auto:Human reply ratio. High ratio = poor list quality → low human engagement → deliverability risk. Clean catch-alls and role-based addresses.">ARR</th>
               <th className="text-right px-4 py-3 font-semibold" style={{ color: '#94a3b8' }}>+Replies</th>
               <th className="text-right px-4 py-3 font-semibold" style={{ color: '#94a3b8' }}>PRR</th>
               <th className="text-right px-4 py-3 font-semibold" style={{ color: '#94a3b8' }}>Booked</th>
