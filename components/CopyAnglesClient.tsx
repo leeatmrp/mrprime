@@ -13,7 +13,9 @@ function pct(n: number): string {
 
 function arrColor(autoReplies: number, totalReplies: number): string {
   if (totalReplies === 0 || autoReplies === 0) return '#94a3b8' // grey — no data
-  const ratio = autoReplies / totalReplies
+  const humanReplies = totalReplies - autoReplies
+  if (humanReplies <= 0) return '#ef4444' // all auto, no human = red
+  const ratio = autoReplies / humanReplies
   if (ratio >= 3) return '#ef4444'   // red — danger
   if (ratio >= 2) return '#f97316'   // orange — warning
   return '#22c55e'                    // green — healthy
@@ -21,7 +23,7 @@ function arrColor(autoReplies: number, totalReplies: number): string {
 
 function arrLabel(autoReplies: number, totalReplies: number): string {
   if (totalReplies === 0) return '—'
-  if (autoReplies === 0) return '0:1'
+  if (autoReplies === 0) return '—'
   const humanReplies = totalReplies - autoReplies
   if (humanReplies <= 0) return `${autoReplies}:0`
   const ratio = autoReplies / humanReplies
