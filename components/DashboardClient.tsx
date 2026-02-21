@@ -59,7 +59,7 @@ export default function DashboardClient({
       {/* Header row */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-bold text-white">Monthly Overview</h1>
+          <h1 className="text-2xl font-bold text-white">Monthly Active</h1>
           <ViewToggle />
         </div>
         <div className="flex items-center gap-3">
