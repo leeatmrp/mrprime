@@ -12,12 +12,14 @@ export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] 
     (acc, c) => {
       acc.contacted += c.emails_sent_count || 0
       acc.replies += c.reply_count || 0
+      acc.autoReplies += c.auto_reply_count || 0
       acc.opps += c.total_opportunities || 0
       return acc
     },
-    { contacted: 0, replies: 0, opps: 0 }
+    { contacted: 0, replies: 0, autoReplies: 0, opps: 0 }
   )
   const totalReplyPct = totals.contacted > 0 ? (totals.replies / totals.contacted) * 100 : 0
+  const totalArr = totals.replies > 0 ? totals.autoReplies / totals.replies : 0
 
   return (
     <div
@@ -28,7 +30,7 @@ export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] 
         <table className="w-full text-sm">
           <thead>
             <tr style={{ background: '#111827' }}>
-              {['Campaign', 'Status', 'Contacted', 'Replies', 'Reply %', 'Opps'].map(h => (
+              {['Campaign', 'Status', 'Contacted', 'Replies', 'Reply %', 'ARR', 'Opps'].map(h => (
                 <th
                   key={h}
                   className="px-4 py-3 text-left font-medium whitespace-nowrap"
@@ -43,7 +45,9 @@ export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] 
             {campaigns.map((c) => {
               const contacted = c.emails_sent_count || 0
               const replyPct = contacted > 0 ? (c.reply_count / contacted) * 100 : 0
+              const campArr = c.reply_count > 0 ? (c.auto_reply_count || 0) / c.reply_count : 0
               const status = statusLabels[c.status] || statusLabels[0]
+              const arrColor = campArr < 2 ? '#10b981' : campArr <= 3 ? '#f97316' : '#ef4444'
 
               return (
                 <tr
@@ -71,6 +75,9 @@ export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] 
                   <td className="px-4 py-3 tabular-nums" style={{ color: '#06b6d4' }}>
                     {replyPct.toFixed(2)}%
                   </td>
+                  <td className="px-4 py-3 tabular-nums" style={{ color: arrColor }}>
+                    {c.reply_count > 0 ? `${campArr.toFixed(1)}:1` : '—'}
+                  </td>
                   <td className="px-4 py-3 tabular-nums" style={{ color: '#ec4899' }}>
                     {c.total_opportunities || 0}
                   </td>
@@ -93,6 +100,9 @@ export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] 
               </td>
               <td className="px-4 py-3 tabular-nums" style={{ color: '#06b6d4' }}>
                 {totalReplyPct.toFixed(2)}%
+              </td>
+              <td className="px-4 py-3 tabular-nums" style={{ color: totalArr < 2 ? '#10b981' : totalArr <= 3 ? '#f97316' : '#ef4444' }}>
+                {totals.replies > 0 ? `${totalArr.toFixed(1)}:1` : '—'}
               </td>
               <td className="px-4 py-3 tabular-nums" style={{ color: '#ec4899' }}>
                 {totals.opps}

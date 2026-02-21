@@ -1,0 +1,47 @@
+# Reporting Dashboard — Lessons Learned
+
+## Lesson 0: Subagents are for exploration, not avoiding work
+- **What happened**: Tried to delegate a straightforward math analysis to a subagent instead of doing it myself.
+- **Why it's wrong**: The building rules say "Offload research, exploration, and parallel analysis to subagents." Computing averages from data I already have is not research — it's the core task.
+- **Rule**: Only use subagents for genuine exploration (codebase search, web research, parallel file reads). Do the actual thinking yourself.
+
+## Lesson 0b: When spreadsheet values can't be reproduced, investigate before shipping
+- **What happened**: Tried 15+ methods to reproduce 6.13% PRR and 491 Leads/PR — none matched. Root cause: the CSV "Avg" row values (contacted=4,743, PR=5) don't match computed averages (11,425 and 6.93), proving the Google Sheets formula references ranges or sheets not in the CSV export.
+- **Rule**: When you can't match the source of truth, verify the raw data is correct (it is — all 14 monthly + 45 weekly rows match), use the most defensible calculation method, label it clearly, and document the discrepancy. Don't pretend the numbers match when they don't.
+
+## Lesson 1: Don't hand-wave data mismatches
+- **What happened**: KPI cards showed 5.28% PRR and 1,604 leads/PR vs spreadsheet's 6.13% and 491. I said "different calculation methods" and moved on.
+- **Why it's wrong**: The whole point of the reporting page is to match the master spreadsheet. If the numbers don't match, the page is wrong.
+- **Rule**: When computed values don't match the source of truth, stop and fix the calculation. Never ship wrong numbers.
+
+## Lesson 2: Verify the rendered page, not just the build
+- **What happened**: I ran `next build` and `vercel --prod`, checked DB row counts, and called it done. Never actually loaded the page in a browser.
+- **Why it's wrong**: Build passing means TypeScript compiles. It doesn't mean the page renders, the chart loads, or the data displays correctly.
+- **Rule**: Always verify the actual rendered output. For dashboards, that means loading the page and checking every section.
+
+## Lesson 3: Use the project's task management files, not just built-in tools
+- **What happened**: I used Claude Code's TaskCreate/TaskUpdate instead of writing to `tasks/todo.md` as the building rules specify.
+- **Why it's wrong**: The building rules exist for a reason — `tasks/todo.md` persists across sessions and is human-readable. Built-in tasks disappear.
+- **Rule**: Always follow the user's building rules for task management, even if built-in tools exist.
+
+## Lesson 4: Know the API schema before the user asks
+- **What happened**: User asked about CRM stages ("meetings booked etc"). I didn't immediately connect `lt_interest_status` (a field I had already seen in the `create_lead` schema) to the CRM pipeline. User had to say "you should know this."
+- **Why it's wrong**: When building features against an API, I should map ALL relevant fields upfront — not discover them ad hoc when the user asks. The `lt_interest_status` field was visible in the MCP schema the entire time; I just never connected it to the "Booked Calls" problem.
+- **Rule**: When integrating with an API, read the full schema once and map every field to its business meaning. Don't wait for the user to point out fields you should already know about.
+
+## Lesson 5: CRM pipeline stages ≠ email classification (Feb 2026)
+- **What happened**: Investigated whether Instantly's CRM pipeline (`lt_interest_status` 2=Meeting Booked, 3=Meeting Done, 4=Closed/Won) could automate the "Booked Calls" metric.
+- **Finding**: Only stage 1 (Interested) is auto-set by Instantly when `i_status=1` on an email. Stages 2-4 require manual advancement in the UI. MrPrime is NOT manually advancing leads. Additionally, leads moved between campaigns lose their CRM data.
+- **Rule**: Don't assume CRM pipeline stages are populated just because the API supports them. Verify actual usage before building automation around it. "Booked Calls" stays manual.
+
+## Lesson 6: Verify API pagination cursor paths before shipping (Feb 2026)
+- **What happened**: `syncReplyClassification` used `data.pagination?.next_starting_after` but Instantly V2 returns cursor at `data.next_starting_after` (top level). Pagination never advanced — all counts capped at first 100 results. PRR showed 200% because positive_replies was inflated.
+- **Rule**: When using a paginated API, verify the cursor path by inspecting actual response shape. Test with data that requires >1 page. Never assume nested path structures.
+
+## Lesson 7: Test API filter parameters actually work (Feb 2026)
+- **What happened**: Used `from_date` parameter in Instantly email API — it doesn't exist and was silently ignored. All email counts were all-time instead of current-month. Combined with Lesson 6, this made classification data completely wrong.
+- **Rule**: Before using any API filter parameter, verify it in the docs or test it explicitly. If the API doesn't return fewer results with the filter, it's being ignored.
+
+## Lesson 8: Always verify the live page, not just the build (Feb 2026)
+- **What happened**: Deployed multiple times and called it done without actually checking the live page showed correct data. User had to point out PRR was 200%.
+- **Rule**: Per building-rules.md Rule 4: NEVER mark done without proving it works. For dashboards, that means loading the live URL and checking rendered values make sense. "Build passes" ≠ "works correctly."

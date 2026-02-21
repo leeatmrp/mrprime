@@ -22,6 +22,7 @@ export interface CampaignRow {
   leads_count: number
   contacted_count: number
   open_count: number
+  auto_reply_count: number
 }
 
 export interface DailyDataPoint {
@@ -36,6 +37,33 @@ export interface WarmupHealth {
   good: number
   warning: number
   avgScore: number
+}
+
+export interface ReportingMonthlyRow {
+  month: string
+  total_email_sent: number
+  total_lead_contacted: number
+  replies: number
+  reply_rate: number
+  positive_replies: number
+  prr: number
+  booked_calls: number
+  booked_calls_rate: number
+  not_interested: number
+  out_of_office: number
+  auto_replies: number
+}
+
+export interface ReportingWeeklyRow {
+  week_start: string
+  total_email_sent: number
+  total_lead_contacted: number
+  replies: number
+  reply_rate: number
+  positive_replies: number
+  prr: number
+  booked_calls: number
+  booked_calls_rate: number
 }
 
 function currentMonthStart(): string {
@@ -98,7 +126,7 @@ export async function fetchCampaigns(supabase: SupabaseClient): Promise<Campaign
   // Get MTD daily_analytics per campaign
   const { data: dailyData } = await supabase
     .from('daily_analytics')
-    .select('campaign_id, new_leads_contacted, unique_replies, opportunities')
+    .select('campaign_id, new_leads_contacted, unique_replies, unique_replies_automatic, opportunities')
     .gte('date', dateStr)
     .not('campaign_id', 'is', null)
 
@@ -111,20 +139,21 @@ export async function fetchCampaigns(supabase: SupabaseClient): Promise<Campaign
   if (!campaigns || !dailyData) return []
 
   // Aggregate daily data by campaign
-  const byCampaign: Record<string, { contacted: number; replies: number; opps: number }> = {}
+  const byCampaign: Record<string, { contacted: number; replies: number; autoReplies: number; opps: number }> = {}
   for (const row of dailyData) {
     if (!row.campaign_id) continue
     if (!byCampaign[row.campaign_id]) {
-      byCampaign[row.campaign_id] = { contacted: 0, replies: 0, opps: 0 }
+      byCampaign[row.campaign_id] = { contacted: 0, replies: 0, autoReplies: 0, opps: 0 }
     }
     byCampaign[row.campaign_id].contacted += row.new_leads_contacted || 0
     byCampaign[row.campaign_id].replies += row.unique_replies || 0
+    byCampaign[row.campaign_id].autoReplies += row.unique_replies_automatic || 0
     byCampaign[row.campaign_id].opps += row.opportunities || 0
   }
 
   return campaigns
     .map(c => {
-      const mtd = byCampaign[c.id] || { contacted: 0, replies: 0, opps: 0 }
+      const mtd = byCampaign[c.id] || { contacted: 0, replies: 0, autoReplies: 0, opps: 0 }
       return {
         id: c.id,
         name: c.name,
@@ -136,6 +165,7 @@ export async function fetchCampaigns(supabase: SupabaseClient): Promise<Campaign
         leads_count: 0,
         contacted_count: 0,
         open_count: 0,
+        auto_reply_count: mtd.autoReplies,
       }
     })
     .filter(c => c.emails_sent_count > 0)
@@ -195,7 +225,7 @@ export async function fetchWeeklyCampaigns(supabase: SupabaseClient): Promise<Ca
   // Get 7-day daily_analytics per campaign
   const { data: dailyData } = await supabase
     .from('daily_analytics')
-    .select('campaign_id, new_leads_contacted, unique_replies, opportunities')
+    .select('campaign_id, new_leads_contacted, unique_replies, unique_replies_automatic, opportunities')
     .gte('date', dateStr)
     .not('campaign_id', 'is', null)
 
@@ -207,20 +237,21 @@ export async function fetchWeeklyCampaigns(supabase: SupabaseClient): Promise<Ca
 
   if (!campaigns || !dailyData) return []
 
-  const byCampaign: Record<string, { contacted: number; replies: number; opps: number }> = {}
+  const byCampaign: Record<string, { contacted: number; replies: number; autoReplies: number; opps: number }> = {}
   for (const row of dailyData) {
     if (!row.campaign_id) continue
     if (!byCampaign[row.campaign_id]) {
-      byCampaign[row.campaign_id] = { contacted: 0, replies: 0, opps: 0 }
+      byCampaign[row.campaign_id] = { contacted: 0, replies: 0, autoReplies: 0, opps: 0 }
     }
     byCampaign[row.campaign_id].contacted += row.new_leads_contacted || 0
     byCampaign[row.campaign_id].replies += row.unique_replies || 0
+    byCampaign[row.campaign_id].autoReplies += row.unique_replies_automatic || 0
     byCampaign[row.campaign_id].opps += row.opportunities || 0
   }
 
   return campaigns
     .map(c => {
-      const weekly = byCampaign[c.id] || { contacted: 0, replies: 0, opps: 0 }
+      const weekly = byCampaign[c.id] || { contacted: 0, replies: 0, autoReplies: 0, opps: 0 }
       return {
         id: c.id,
         name: c.name,
@@ -232,6 +263,7 @@ export async function fetchWeeklyCampaigns(supabase: SupabaseClient): Promise<Ca
         leads_count: 0,
         contacted_count: 0,
         open_count: 0,
+        auto_reply_count: weekly.autoReplies,
       }
     })
     .filter(c => c.emails_sent_count > 0)
@@ -306,4 +338,24 @@ export async function fetchWarmupHealth(supabase: SupabaseClient): Promise<Warmu
     warning,
     avgScore: Math.round((totalScore / accounts.length) * 10) / 10,
   }
+}
+
+export async function fetchReportingMonthly(supabase: SupabaseClient): Promise<ReportingMonthlyRow[]> {
+  const { data, error } = await supabase
+    .from('reporting_monthly')
+    .select('month, total_email_sent, total_lead_contacted, replies, reply_rate, positive_replies, prr, booked_calls, booked_calls_rate, not_interested, out_of_office, auto_replies')
+    .order('month', { ascending: true })
+
+  if (error) console.error('fetchReportingMonthly error:', error)
+  return (data || []) as ReportingMonthlyRow[]
+}
+
+export async function fetchReportingWeekly(supabase: SupabaseClient): Promise<ReportingWeeklyRow[]> {
+  const { data, error } = await supabase
+    .from('reporting_weekly')
+    .select('week_start, total_email_sent, total_lead_contacted, replies, reply_rate, positive_replies, prr, booked_calls, booked_calls_rate')
+    .order('week_start', { ascending: true })
+
+  if (error) console.error('fetchReportingWeekly error:', error)
+  return (data || []) as ReportingWeeklyRow[]
 }

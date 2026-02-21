@@ -118,6 +118,8 @@ async function syncDailyAnalytics(supabase: Supabase) {
           unique_opened: day.unique_opened || 0,
           replies: day.replies || 0,
           unique_replies: day.unique_replies || 0,
+          replies_automatic: day.replies_automatic || 0,
+          unique_replies_automatic: day.unique_replies_automatic || 0,
           clicks: day.clicks || 0,
           unique_clicks: day.unique_clicks || 0,
           opportunities: day.opportunities || 0,
@@ -159,6 +161,8 @@ async function syncDailyAnalytics(supabase: Supabase) {
               unique_opened: day.unique_opened || 0,
               replies: day.replies || 0,
               unique_replies: day.unique_replies || 0,
+              replies_automatic: day.replies_automatic || 0,
+              unique_replies_automatic: day.unique_replies_automatic || 0,
               clicks: day.clicks || 0,
               unique_clicks: day.unique_clicks || 0,
               opportunities: day.opportunities || 0,
@@ -228,6 +232,124 @@ async function syncDailyAnalytics(supabase: Supabase) {
   return { aggregateDays: aggDays, campaigns: activeCampaigns?.length || 0, oppsFixed }
 }
 
+async function syncReplyClassification(supabase: Supabase) {
+  // Get current month boundaries
+  const now = new Date()
+  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+  const monthStartISO = `${monthStart}T00:00:00.000Z`
+  const monthDate = monthStart // for upsert
+
+  // Count unique leads by i_status for current month
+  // Paginates desc, deduplicates by lead email, stops at month boundary
+  // i_status: 1 = Positive, -1 = Not Interested, 0 = Neutral/OOO
+  async function countUniqueLeads(iStatus: number): Promise<{ count: number; ooo: number }> {
+    const leads = new Set<string>()
+    const oooLeads = new Set<string>()
+    let cursor: string | null = null
+    let reachedPastMonth = false
+
+    do {
+      const params = new URLSearchParams({
+        email_type: 'received',
+        i_status: String(iStatus),
+        limit: '100',
+        sort_order: 'desc',
+      })
+      if (cursor) params.set('starting_after', cursor)
+      const data = await fetchInstantly(`/emails?${params}`)
+      const items = data.items || []
+      if (!Array.isArray(items) || items.length === 0) break
+
+      for (const email of items) {
+        const ts = (email.timestamp_created || '') as string
+        if (ts < monthStartISO) {
+          reachedPastMonth = true
+          break
+        }
+        const leadEmail = (email.lead || '') as string
+        if (leadEmail) {
+          leads.add(leadEmail)
+          // Detect OOO from neutral email subjects
+          if (iStatus === 0) {
+            const subject = ((email.subject || '') as string).toLowerCase()
+            if (
+              subject.includes('automatic reply') ||
+              subject.includes('out of office') ||
+              subject.includes('auto-reply') ||
+              subject.includes('autoreply') ||
+              subject.includes('away from office') ||
+              subject.includes('i am out of') ||
+              subject.includes('on vacation') ||
+              subject.includes('on leave')
+            ) {
+              oooLeads.add(leadEmail)
+            }
+          }
+        }
+      }
+
+      cursor = data.next_starting_after || null
+    } while (cursor && !reachedPastMonth)
+
+    return { count: leads.size, ooo: oooLeads.size }
+  }
+
+  const [positiveResult, notInterestedResult, neutralResult] = await Promise.all([
+    countUniqueLeads(1),
+    countUniqueLeads(-1),
+    countUniqueLeads(0),
+  ])
+
+  const positive = positiveResult.count
+  const notInterested = notInterestedResult.count
+  const neutral = neutralResult.count
+  const ooo = neutralResult.ooo
+
+  // Get current month's aggregate data from daily_analytics
+  const { data: dailyData } = await supabase
+    .from('daily_analytics')
+    .select('new_leads_contacted, sent, unique_replies, unique_replies_automatic')
+    .gte('date', monthStart)
+    .is('campaign_id', null)
+
+  const totalSent = dailyData?.reduce(
+    (s: number, r: { sent: number }) => s + (r.sent || 0), 0
+  ) || 0
+  const totalContacted = dailyData?.reduce(
+    (s: number, r: { new_leads_contacted: number }) => s + (r.new_leads_contacted || 0), 0
+  ) || 0
+  const totalReplies = dailyData?.reduce(
+    (s: number, r: { unique_replies: number }) => s + (r.unique_replies || 0), 0
+  ) || 0
+  const totalAutoReplies = dailyData?.reduce(
+    (s: number, r: { unique_replies_automatic: number }) => s + (r.unique_replies_automatic || 0), 0
+  ) || 0
+
+  const replyRate = totalContacted > 0 ? Math.round((totalReplies / totalContacted) * 10000) / 100 : 0
+  const prr = totalReplies > 0 ? Math.round((positive / totalReplies) * 10000) / 100 : 0
+
+  // Upsert current month into reporting_monthly
+  const { error } = await supabase
+    .from('reporting_monthly')
+    .upsert({
+      month: monthDate,
+      total_email_sent: totalSent,
+      total_lead_contacted: totalContacted,
+      replies: totalReplies,
+      reply_rate: replyRate,
+      positive_replies: positive,
+      prr,
+      not_interested: notInterested,
+      out_of_office: ooo,
+      auto_replies: totalAutoReplies,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'month' })
+
+  if (error) console.error('Reporting monthly upsert error:', error)
+
+  return { positive, notInterested, neutral, ooo, totalReplies, replyRate, prr }
+}
+
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization')
   if (authHeader !== `Bearer ${CRON_SECRET}`) {
@@ -243,12 +365,16 @@ export async function GET(request: Request) {
       syncDailyAnalytics(supabase),
     ])
 
+    // Reply classification runs after daily sync (needs fresh daily_analytics)
+    const replyClassification = await syncReplyClassification(supabase)
+
     const result = {
       ok: true,
       timestamp: new Date().toISOString(),
       campaigns,
       accounts,
       daily,
+      replyClassification,
     }
 
     console.log('Sync completed:', result)
