@@ -54,3 +54,8 @@
 ## Lesson 10: Read tasks/lessons.md BEFORE building (Feb 21)
 - **What happened**: Started building Copy Angles page without reading the 8 existing lessons. Repeated Lesson 2 and Lesson 8 (not verifying rendered output). Would have caught the BC Rate issue too.
 - **Rule**: ALWAYS read `tasks/lessons.md` and `tasks/skills.md` at the START of any session before writing code. This is now Rule 0 in build-rules.
+
+## Lesson 11: Plan mode for continued work too — not just new tasks (Feb 21)
+- **What happened**: Resumed ARR backfill work from a previous session. Had clear context from the prior plan, so skipped plan mode and jumped straight into deploying + coding. User called it out.
+- **Why it's wrong**: Build Rule 1 says "Enter plan mode for ANY non-trivial task (3+ steps)." Resuming multi-step work (deploy → backfill → UI → sync fix → cleanup → verify = 6 steps) still counts. Writing the plan to `tasks/todo.md` first ensures nothing is missed and gives the user visibility.
+- **Rule**: Even when continuing prior work, write the remaining steps to `tasks/todo.md` and check in BEFORE executing. "I already know the plan" is not an excuse to skip the process.

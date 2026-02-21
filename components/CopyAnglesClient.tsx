@@ -11,6 +11,23 @@ function pct(n: number): string {
   return `${n.toFixed(2)}%`
 }
 
+function arrColor(autoReplies: number, totalReplies: number): string {
+  if (totalReplies === 0 || autoReplies === 0) return '#94a3b8' // grey — no data
+  const ratio = autoReplies / totalReplies
+  if (ratio >= 3) return '#ef4444'   // red — danger
+  if (ratio >= 2) return '#f97316'   // orange — warning
+  return '#22c55e'                    // green — healthy
+}
+
+function arrLabel(autoReplies: number, totalReplies: number): string {
+  if (totalReplies === 0) return '—'
+  if (autoReplies === 0) return '0:1'
+  const humanReplies = totalReplies - autoReplies
+  if (humanReplies <= 0) return `${autoReplies}:0`
+  const ratio = autoReplies / humanReplies
+  return `${ratio.toFixed(1)}:1`
+}
+
 interface MonthGroup {
   label: string
   rows: CopyAngleRow[]
@@ -22,6 +39,7 @@ interface MonthGroup {
     prr: number
     booked: number
     bcRate: number
+    autoReplies: number
   }
 }
 
@@ -43,6 +61,7 @@ function groupByMonth(data: CopyAngleRow[]): MonthGroup[] {
     const replies = rows.reduce((s, r) => s + r.total_replies, 0)
     const positive = rows.reduce((s, r) => s + r.positive_replies, 0)
     const booked = rows.reduce((s, r) => s + r.booked_calls, 0)
+    const autoReplies = rows.reduce((s, r) => s + (r.auto_replies || 0), 0)
 
     const date = new Date(month + 'T00:00:00')
     const label = date.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
@@ -58,6 +77,7 @@ function groupByMonth(data: CopyAngleRow[]): MonthGroup[] {
         prr: replies > 0 ? (positive / replies) * 100 : 0,
         booked,
         bcRate: positive > 0 ? (booked / positive) * 100 : 0,
+        autoReplies,
       },
     }
   })
@@ -85,6 +105,7 @@ export default function CopyAnglesClient({ data }: { data: CopyAngleRow[] }) {
               <th className="text-right px-4 py-3 font-semibold" style={{ color: '#94a3b8' }}>Prospects</th>
               <th className="text-right px-4 py-3 font-semibold" style={{ color: '#94a3b8' }}>Replies</th>
               <th className="text-right px-4 py-3 font-semibold" style={{ color: '#94a3b8' }}>Reply Rate</th>
+              <th className="text-right px-4 py-3 font-semibold" style={{ color: '#94a3b8' }}>ARR</th>
               <th className="text-right px-4 py-3 font-semibold" style={{ color: '#94a3b8' }}>+Replies</th>
               <th className="text-right px-4 py-3 font-semibold" style={{ color: '#94a3b8' }}>PRR</th>
               <th className="text-right px-4 py-3 font-semibold" style={{ color: '#94a3b8' }}>Booked</th>
@@ -107,7 +128,7 @@ function MonthSection({ group }: { group: MonthGroup }) {
     <>
       {/* Month header */}
       <tr style={{ background: '#1e293b' }}>
-        <td colSpan={8} className="px-4 py-2 font-bold text-white text-base">
+        <td colSpan={9} className="px-4 py-2 font-bold text-white text-base">
           {group.label}
         </td>
       </tr>
@@ -123,6 +144,9 @@ function MonthSection({ group }: { group: MonthGroup }) {
           <td className="px-4 py-2 text-right" style={{ color: '#94a3b8' }}>{fmt(row.total_prospects)}</td>
           <td className="px-4 py-2 text-right" style={{ color: '#94a3b8' }}>{fmt(row.total_replies)}</td>
           <td className="px-4 py-2 text-right" style={{ color: '#94a3b8' }}>{pct(row.reply_rate)}</td>
+          <td className="px-4 py-2 text-right font-medium" style={{ color: arrColor(row.auto_replies || 0, row.total_replies) }}>
+            {arrLabel(row.auto_replies || 0, row.total_replies)}
+          </td>
           <td className="px-4 py-2 text-right" style={{ color: '#94a3b8' }}>{fmt(row.positive_replies)}</td>
           <td className="px-4 py-2 text-right" style={{ color: '#94a3b8' }}>{pct(row.prr)}</td>
           <td className="px-4 py-2 text-right" style={{ color: '#94a3b8' }}>{fmt(row.booked_calls)}</td>
@@ -136,6 +160,9 @@ function MonthSection({ group }: { group: MonthGroup }) {
         <td className="px-4 py-2 text-right font-bold" style={{ color: '#f97316' }}>{fmt(group.totals.prospects)}</td>
         <td className="px-4 py-2 text-right font-bold" style={{ color: '#f97316' }}>{fmt(group.totals.replies)}</td>
         <td className="px-4 py-2 text-right font-bold" style={{ color: '#f97316' }}>{pct(group.totals.replyRate)}</td>
+        <td className="px-4 py-2 text-right font-bold" style={{ color: arrColor(group.totals.autoReplies, group.totals.replies) }}>
+          {arrLabel(group.totals.autoReplies, group.totals.replies)}
+        </td>
         <td className="px-4 py-2 text-right font-bold" style={{ color: '#f97316' }}>{fmt(group.totals.positive)}</td>
         <td className="px-4 py-2 text-right font-bold" style={{ color: '#f97316' }}>{pct(group.totals.prr)}</td>
         <td className="px-4 py-2 text-right font-bold" style={{ color: '#f97316' }}>{fmt(group.totals.booked)}</td>

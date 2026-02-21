@@ -350,6 +350,19 @@ async function syncReplyClassification(supabase: Supabase) {
   return { positive, notInterested, neutral, ooo, totalReplies, replyRate, prr }
 }
 
+// Extract copy angle name from Instantly campaign name
+// Pattern: "[W]C123 - US - AMZ Sellers - Copy Angle Name"
+function extractCopyAngle(campaignName: string): string {
+  const parts = campaignName.split(' - ')
+  if (parts.length >= 4) {
+    return parts.slice(3).join(' - ').trim()
+  }
+  if (parts.length === 3) {
+    return parts[2].trim()
+  }
+  return campaignName.trim()
+}
+
 async function syncCopyAnglesMonthly(supabase: Supabase) {
   // Get all campaigns (active + completed)
   const { data: campaigns } = await supabase
@@ -364,44 +377,56 @@ async function syncCopyAnglesMonthly(supabase: Supabase) {
   const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
   const monthDate = monthStart
 
+  // Get existing copy angle names for matching
+  const { data: caRows } = await supabase
+    .from('copy_angles_monthly')
+    .select('campaign_name')
+    .eq('month', monthDate)
+  const existingNames = new Set((caRows || []).map((r: { campaign_name: string }) => r.campaign_name))
+
   // Get daily_analytics for current month, per campaign
   const { data: dailyData } = await supabase
     .from('daily_analytics')
-    .select('campaign_id, new_leads_contacted, unique_replies')
+    .select('campaign_id, new_leads_contacted, unique_replies, unique_replies_automatic')
     .gte('date', monthStart)
     .not('campaign_id', 'is', null)
 
   if (!dailyData) return { synced: 0 }
 
   // Aggregate by campaign
-  const byCampaign: Record<string, { contacted: number; replies: number }> = {}
+  const byCampaign: Record<string, { contacted: number; replies: number; autoReplies: number }> = {}
   for (const row of dailyData) {
     if (!row.campaign_id) continue
     if (!byCampaign[row.campaign_id]) {
-      byCampaign[row.campaign_id] = { contacted: 0, replies: 0 }
+      byCampaign[row.campaign_id] = { contacted: 0, replies: 0, autoReplies: 0 }
     }
     byCampaign[row.campaign_id].contacted += row.new_leads_contacted || 0
     byCampaign[row.campaign_id].replies += row.unique_replies || 0
+    byCampaign[row.campaign_id].autoReplies += row.unique_replies_automatic || 0
   }
 
-  let synced = 0
+  // Aggregate by copy angle name (multiple campaigns may share same copy angle)
+  const byCopyAngle: Record<string, { contacted: number; replies: number; autoReplies: number }> = {}
   for (const camp of campaigns) {
     const data = byCampaign[camp.id]
     if (!data || data.contacted === 0) continue
 
+    const caName = extractCopyAngle(camp.name)
+    if (!byCopyAngle[caName]) {
+      byCopyAngle[caName] = { contacted: 0, replies: 0, autoReplies: 0 }
+    }
+    byCopyAngle[caName].contacted += data.contacted
+    byCopyAngle[caName].replies += data.replies
+    byCopyAngle[caName].autoReplies += data.autoReplies
+  }
+
+  let synced = 0
+  for (const [caName, data] of Object.entries(byCopyAngle)) {
     const replyRate = data.contacted > 0
       ? Math.round((data.replies / data.contacted) * 10000) / 100
       : 0
 
-    // Check if row exists to preserve manual fields
-    const { data: existing } = await supabase
-      .from('copy_angles_monthly')
-      .select('id')
-      .eq('month', monthDate)
-      .eq('campaign_name', camp.name)
-      .maybeSingle()
-
-    if (existing) {
+    if (existingNames.has(caName)) {
       // Update only API-computable fields, preserve positive_replies/booked_calls
       await supabase
         .from('copy_angles_monthly')
@@ -409,19 +434,22 @@ async function syncCopyAnglesMonthly(supabase: Supabase) {
           total_prospects: data.contacted,
           total_replies: data.replies,
           reply_rate: replyRate,
+          auto_replies: data.autoReplies,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', existing.id)
+        .eq('month', monthDate)
+        .eq('campaign_name', caName)
     } else {
       // Insert new row
       await supabase
         .from('copy_angles_monthly')
         .insert({
           month: monthDate,
-          campaign_name: camp.name,
+          campaign_name: caName,
           total_prospects: data.contacted,
           total_replies: data.replies,
           reply_rate: replyRate,
+          auto_replies: data.autoReplies,
         })
     }
     synced++

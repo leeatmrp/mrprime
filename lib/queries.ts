@@ -360,6 +360,7 @@ export interface CopyAngleRow {
   prr: number
   booked_calls: number
   booked_calls_rate: number
+  auto_replies: number
 }
 
 export async function fetchCopyAnglesMonthly(supabase: SupabaseClient): Promise<CopyAngleRow[]> {
@@ -369,7 +370,7 @@ export async function fetchCopyAnglesMonthly(supabase: SupabaseClient): Promise<
 
   const { data, error } = await supabase
     .from('copy_angles_monthly')
-    .select('month, campaign_name, total_prospects, total_replies, reply_rate, positive_replies, prr, booked_calls, booked_calls_rate')
+    .select('month, campaign_name, total_prospects, total_replies, reply_rate, positive_replies, prr, booked_calls, booked_calls_rate, auto_replies')
     .gte('month', cutoffStr)
     .order('month', { ascending: false })
 

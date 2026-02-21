@@ -62,6 +62,17 @@
 - [x] **Lessons captured**: Lesson 9 (never trust spreadsheet calculated columns), Lesson 10 (read lessons before building)
 - [x] **Verified**: 127 rows, 0 rate mismatches, spot-checks pass, deployed to Vercel
 
+## Completed (Round 7 — Historical ARR for Copy Angles, Feb 21)
+- [x] **Supabase migration**: Added `auto_replies` column to `copy_angles_monthly`
+- [x] **Backfill**: Temporary Vercel route queried Instantly daily analytics for all 117 Supabase campaigns (not just 16 active from API list)
+  - 42 campaigns matched to copy angle names, 36 (month, campaign) pairs populated
+  - Data covers Nov 2025 - Feb 2026 (no auto-reply data exists before Nov 2025)
+- [x] **UI**: Added ARR column to CopyAnglesClient with color-coded ratios (green <2:1, orange 2-3:1, red >3:1)
+- [x] **Query**: Updated `CopyAngleRow` interface + `fetchCopyAnglesMonthly()` to include `auto_replies`
+- [x] **Sync fix**: `syncCopyAnglesMonthly()` now extracts copy angle name from campaign name pattern (was using full Instantly name), aggregates by copy angle, includes `auto_replies`
+- [x] **Cleanup**: Deleted temporary `backfill-arr` route + `backfill_arr.py`
+- [x] **Verified**: 10/10 structural checks + 4/4 spot-checks pass on live site, all 4 pages return 200
+
 ## Pending
 - [ ] Consider building a manual input UI for Booked Calls (form on reporting page, writes to Supabase)
 - [ ] Clean up temp files (query_crm_stages.py, parse_emails.py, .env.local.full)
