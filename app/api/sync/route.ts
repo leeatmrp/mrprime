@@ -350,6 +350,86 @@ async function syncReplyClassification(supabase: Supabase) {
   return { positive, notInterested, neutral, ooo, totalReplies, replyRate, prr }
 }
 
+async function syncCopyAnglesMonthly(supabase: Supabase) {
+  // Get all campaigns (active + completed)
+  const { data: campaigns } = await supabase
+    .from('campaigns')
+    .select('id, name')
+    .in('status', [1, 2])
+
+  if (!campaigns || campaigns.length === 0) return { synced: 0 }
+
+  // Current month boundaries
+  const now = new Date()
+  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+  const monthDate = monthStart
+
+  // Get daily_analytics for current month, per campaign
+  const { data: dailyData } = await supabase
+    .from('daily_analytics')
+    .select('campaign_id, new_leads_contacted, unique_replies')
+    .gte('date', monthStart)
+    .not('campaign_id', 'is', null)
+
+  if (!dailyData) return { synced: 0 }
+
+  // Aggregate by campaign
+  const byCampaign: Record<string, { contacted: number; replies: number }> = {}
+  for (const row of dailyData) {
+    if (!row.campaign_id) continue
+    if (!byCampaign[row.campaign_id]) {
+      byCampaign[row.campaign_id] = { contacted: 0, replies: 0 }
+    }
+    byCampaign[row.campaign_id].contacted += row.new_leads_contacted || 0
+    byCampaign[row.campaign_id].replies += row.unique_replies || 0
+  }
+
+  let synced = 0
+  for (const camp of campaigns) {
+    const data = byCampaign[camp.id]
+    if (!data || data.contacted === 0) continue
+
+    const replyRate = data.contacted > 0
+      ? Math.round((data.replies / data.contacted) * 10000) / 100
+      : 0
+
+    // Check if row exists to preserve manual fields
+    const { data: existing } = await supabase
+      .from('copy_angles_monthly')
+      .select('id')
+      .eq('month', monthDate)
+      .eq('campaign_name', camp.name)
+      .maybeSingle()
+
+    if (existing) {
+      // Update only API-computable fields, preserve positive_replies/booked_calls
+      await supabase
+        .from('copy_angles_monthly')
+        .update({
+          total_prospects: data.contacted,
+          total_replies: data.replies,
+          reply_rate: replyRate,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existing.id)
+    } else {
+      // Insert new row
+      await supabase
+        .from('copy_angles_monthly')
+        .insert({
+          month: monthDate,
+          campaign_name: camp.name,
+          total_prospects: data.contacted,
+          total_replies: data.replies,
+          reply_rate: replyRate,
+        })
+    }
+    synced++
+  }
+
+  return { synced }
+}
+
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization')
   if (authHeader !== `Bearer ${CRON_SECRET}`) {
@@ -368,6 +448,9 @@ export async function GET(request: Request) {
     // Reply classification runs after daily sync (needs fresh daily_analytics)
     const replyClassification = await syncReplyClassification(supabase)
 
+    // Copy angles sync runs after daily sync
+    const copyAngles = await syncCopyAnglesMonthly(supabase)
+
     const result = {
       ok: true,
       timestamp: new Date().toISOString(),
@@ -375,6 +458,7 @@ export async function GET(request: Request) {
       accounts,
       daily,
       replyClassification,
+      copyAngles,
     }
 
     console.log('Sync completed:', result)

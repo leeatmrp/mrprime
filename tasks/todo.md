@@ -49,6 +49,19 @@
 - [x] All 4 KPI cards render correctly with 12-month aggregate data
 - [x] Deployed and verified on https://mrprime-r8s2.vercel.app
 
+## Completed (Round 6 — Copy Angles page, Feb 21)
+- [x] **Supabase table**: `copy_angles_monthly` with UNIQUE(month, campaign_name) + RLS
+- [x] **CSV import**: 127 rows across 11 months (Apr 2025 - Feb 2026), 27 empty rows filtered, duplicates summed
+- [x] **Query + types**: `CopyAngleRow` interface + `fetchCopyAnglesMonthly()` in `lib/queries.ts`
+- [x] **UI component**: `CopyAnglesClient.tsx` — grouped-by-month table with totals rows, orange accent
+- [x] **Page**: `app/dashboard/copy-angles/page.tsx` (SSR, force-dynamic)
+- [x] **ViewToggle**: Added "Copy Angles" button — nav now shows `[Monthly | Weekly]  [KPIs]  [Copy Angles]`
+- [x] **Sync route**: `syncCopyAnglesMonthly()` updates current month from daily_analytics, preserves manual positive_replies/booked_calls
+- [x] **FIX: Recalculated all rates** — reply_rate, prr, booked_calls_rate recomputed from raw integers. 11 rows had wrong values from spreadsheet `#DIV/0!` formulas.
+- [x] **Build rules updated**: Added Rule 0 (Context Loading) — read tasks/lessons.md, tasks/skills.md, MEMORY.md BEFORE any code
+- [x] **Lessons captured**: Lesson 9 (never trust spreadsheet calculated columns), Lesson 10 (read lessons before building)
+- [x] **Verified**: 127 rows, 0 rate mismatches, spot-checks pass, deployed to Vercel
+
 ## Pending
 - [ ] Consider building a manual input UI for Booked Calls (form on reporting page, writes to Supabase)
 - [ ] Clean up temp files (query_crm_stages.py, parse_emails.py, .env.local.full)

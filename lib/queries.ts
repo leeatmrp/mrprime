@@ -350,6 +350,33 @@ export async function fetchReportingMonthly(supabase: SupabaseClient): Promise<R
   return (data || []) as ReportingMonthlyRow[]
 }
 
+export interface CopyAngleRow {
+  month: string
+  campaign_name: string
+  total_prospects: number
+  total_replies: number
+  reply_rate: number
+  positive_replies: number
+  prr: number
+  booked_calls: number
+  booked_calls_rate: number
+}
+
+export async function fetchCopyAnglesMonthly(supabase: SupabaseClient): Promise<CopyAngleRow[]> {
+  const now = new Date()
+  const cutoff = new Date(now.getFullYear(), now.getMonth() - 11, 1)
+  const cutoffStr = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-01`
+
+  const { data, error } = await supabase
+    .from('copy_angles_monthly')
+    .select('month, campaign_name, total_prospects, total_replies, reply_rate, positive_replies, prr, booked_calls, booked_calls_rate')
+    .gte('month', cutoffStr)
+    .order('month', { ascending: false })
+
+  if (error) console.error('fetchCopyAnglesMonthly error:', error)
+  return (data || []) as CopyAngleRow[]
+}
+
 export async function fetchReportingWeekly(supabase: SupabaseClient): Promise<ReportingWeeklyRow[]> {
   const { data, error } = await supabase
     .from('reporting_weekly')

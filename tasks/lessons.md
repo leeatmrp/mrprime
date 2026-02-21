@@ -45,3 +45,12 @@
 ## Lesson 8: Always verify the live page, not just the build (Feb 2026)
 - **What happened**: Deployed multiple times and called it done without actually checking the live page showed correct data. User had to point out PRR was 200%.
 - **Rule**: Per building-rules.md Rule 4: NEVER mark done without proving it works. For dashboards, that means loading the live URL and checking rendered values make sense. "Build passes" ≠ "works correctly."
+
+## Lesson 9: Never trust spreadsheet calculated columns — recompute from raw values (Feb 21)
+- **What happened**: Imported `booked_calls_rate` directly from CSV. Many rows had `#DIV/0!` (→ stored as 0) even when `booked_calls` and `positive_replies` had valid data (e.g. 5 positive, 3 booked → should be 60%, stored as 0%).
+- **Rule**: When importing from spreadsheets, ALWAYS recompute calculated fields (`reply_rate`, `prr`, `booked_calls_rate`) from their raw components. Spreadsheet formulas break silently.
+- **Same applies to**: `reply_rate` (= replies/prospects), `prr` (= positive/replies). Import the RAW integers, compute rates in code.
+
+## Lesson 10: Read tasks/lessons.md BEFORE building (Feb 21)
+- **What happened**: Started building Copy Angles page without reading the 8 existing lessons. Repeated Lesson 2 and Lesson 8 (not verifying rendered output). Would have caught the BC Rate issue too.
+- **Rule**: ALWAYS read `tasks/lessons.md` and `tasks/skills.md` at the START of any session before writing code. This is now Rule 0 in build-rules.

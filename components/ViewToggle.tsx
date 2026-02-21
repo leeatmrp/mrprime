@@ -11,6 +11,7 @@ const timeViews = [
 export default function ViewToggle() {
   const pathname = usePathname()
   const isKPIs = pathname === '/dashboard/reporting'
+  const isCopyAngles = pathname === '/dashboard/copy-angles'
 
   return (
     <div className="flex items-center gap-3">
@@ -20,7 +21,7 @@ export default function ViewToggle() {
         style={{ borderColor: '#374151', background: '#111827' }}
       >
         {timeViews.map(({ href, label }) => {
-          const isActive = !isKPIs && pathname === href
+          const isActive = !isKPIs && !isCopyAngles && pathname === href
           return (
             <Link
               key={href}
@@ -48,6 +49,19 @@ export default function ViewToggle() {
         }}
       >
         KPIs
+      </Link>
+
+      {/* Copy Angles button — separate */}
+      <Link
+        href="/dashboard/copy-angles"
+        className="px-4 py-1.5 rounded-lg border text-sm font-medium transition-all"
+        style={{
+          borderColor: isCopyAngles ? '#f97316' : '#374151',
+          background: isCopyAngles ? '#f97316' : '#111827',
+          color: isCopyAngles ? '#fff' : '#94a3b8',
+        }}
+      >
+        Copy Angles
       </Link>
     </div>
   )
