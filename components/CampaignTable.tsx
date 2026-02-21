@@ -19,8 +19,7 @@ export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] 
     { contacted: 0, replies: 0, autoReplies: 0, opps: 0 }
   )
   const totalReplyPct = totals.contacted > 0 ? (totals.replies / totals.contacted) * 100 : 0
-  const totalHuman = totals.replies - totals.autoReplies
-  const totalArr = totalHuman > 0 ? totals.autoReplies / totalHuman : (totals.autoReplies > 0 ? 999 : 0)
+  const totalArr = totals.replies > 0 ? totals.autoReplies / totals.replies : 0
 
   return (
     <div
@@ -46,8 +45,8 @@ export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] 
             {campaigns.map((c) => {
               const contacted = c.emails_sent_count || 0
               const replyPct = contacted > 0 ? (c.reply_count / contacted) * 100 : 0
-              const humanReplies = c.reply_count - (c.auto_reply_count || 0)
-              const campArr = humanReplies > 0 ? (c.auto_reply_count || 0) / humanReplies : ((c.auto_reply_count || 0) > 0 ? 999 : 0)
+              // unique_replies = human replies, unique_replies_automatic = auto (independent counts)
+              const campArr = c.reply_count > 0 ? (c.auto_reply_count || 0) / c.reply_count : 0
               const status = statusLabels[c.status] || statusLabels[0]
               const arrColor = campArr < 2 ? '#10b981' : campArr <= 3 ? '#f97316' : '#ef4444'
 

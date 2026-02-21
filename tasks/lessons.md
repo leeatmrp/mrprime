@@ -59,3 +59,17 @@
 - **What happened**: Resumed ARR backfill work from a previous session. Had clear context from the prior plan, so skipped plan mode and jumped straight into deploying + coding. User called it out.
 - **Why it's wrong**: Build Rule 1 says "Enter plan mode for ANY non-trivial task (3+ steps)." Resuming multi-step work (deploy → backfill → UI → sync fix → cleanup → verify = 6 steps) still counts. Writing the plan to `tasks/todo.md` first ensures nothing is missed and gives the user visibility.
 - **Rule**: Even when continuing prior work, write the remaining steps to `tasks/todo.md` and check in BEFORE executing. "I already know the plan" is not an excuse to skip the process.
+
+## Lesson 12: Understand API field semantics BEFORE writing formulas (Feb 21)
+- **What happened**: Assumed `unique_replies` was a superset containing both human + auto replies. Wrote ARR as `auto / (total - auto)` to get human count. This produced negative numbers and 999:1 ratios because `unique_replies` is ALREADY human-only — it does NOT include auto.
+- **Discovery**: Queried daily_analytics and found `unique_replies_automatic > unique_replies` in many rows. This proves they are INDEPENDENT counts from separate lead pools:
+  - `unique_replies` = unique leads with HUMAN replies only
+  - `unique_replies_automatic` = unique leads with AUTO replies only
+  - These can overlap (same lead can have both) but are counted independently
+- **Correct formula**: `ARR = unique_replies_automatic / unique_replies` (simple division, NO subtraction)
+- **Rule**: Before writing any formula involving API fields, verify the field semantics by examining actual data patterns (min/max/comparisons), not by guessing from field names. "unique_replies" sounds like "all unique replies" but it means "unique human replies."
+
+## Lesson 13: Stale data ≠ wrong formula — diagnose before changing code (Feb 21)
+- **What happened**: User saw wrong ARR values. Instead of checking whether the data was stale, I changed the formula (introducing the 999:1 bug from Lesson 12). The actual problem was that Supabase data hadn't been synced since Feb 12 — auto reply counts were 0 for recent days while the API had updated them.
+- **Root cause**: Instantly attributes auto replies retroactively. The daily 6am cron captures a snapshot, but auto counts increase after the snapshot. A manual sync refresh fixes it.
+- **Rule**: When dashboard values look wrong, check data freshness FIRST (when was last sync? does DB match API?). Only change code if the formula itself is proven wrong. "Data is stale" and "formula is broken" are different problems requiring different fixes.

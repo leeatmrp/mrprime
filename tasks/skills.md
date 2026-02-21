@@ -58,9 +58,14 @@ Pattern: `[W]C{N} - {region} - {audience} - {copy_angle_name}`
 
 ## Key Metrics
 - **new_leads_contacted** = "Sequence Started" (use this, NOT `sent`)
-- **ARR** = auto_replies / human_replies (color: green <2:1, orange 2-3:1, red >3:1)
+- **ARR** = `unique_replies_automatic / unique_replies` (color: green <2:1, orange 2-3:1, red >=3:1)
+  - CRITICAL: `unique_replies` = human replies ONLY (NOT a superset of all replies)
+  - CRITICAL: `unique_replies_automatic` = auto replies ONLY (independent count, can exceed human)
+  - These are SEPARATE lead pools — NO subtraction, just simple division
+  - Show "—" when auto=0 (no ARR data) or human=0 (division by zero)
 - **Booked Calls** = manual only (CRM stages 2-4 not used by MrPrime)
 - **Bounce Rate** = all-time from campaigns table (not tracked in daily_analytics)
+- **Data freshness**: Instantly attributes auto replies retroactively. Daily cron captures a snapshot; manual sync via /api/sync gets latest. Stale data ≠ wrong formula.
 
 ## Components
 

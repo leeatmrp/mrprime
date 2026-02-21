@@ -11,21 +11,20 @@ function pct(n: number): string {
   return `${n.toFixed(2)}%`
 }
 
-function arrColor(autoReplies: number, totalReplies: number): string {
-  if (totalReplies === 0 || autoReplies === 0) return '#94a3b8' // grey — no data
-  const humanReplies = totalReplies - autoReplies
-  if (humanReplies <= 0) return '#ef4444' // all auto, no human = red
+// unique_replies = human replies, unique_replies_automatic = auto replies (independent counts)
+// ARR = auto / human — no subtraction, these are separate lead pools
+function arrColor(autoReplies: number, humanReplies: number): string {
+  if (humanReplies === 0 || autoReplies === 0) return '#94a3b8' // grey — no data
   const ratio = autoReplies / humanReplies
   if (ratio >= 3) return '#ef4444'   // red — danger
   if (ratio >= 2) return '#f97316'   // orange — warning
   return '#22c55e'                    // green — healthy
 }
 
-function arrLabel(autoReplies: number, totalReplies: number): string {
-  if (totalReplies === 0) return '—'
+function arrLabel(autoReplies: number, humanReplies: number): string {
+  if (humanReplies === 0 && autoReplies === 0) return '—'
   if (autoReplies === 0) return '—'
-  const humanReplies = totalReplies - autoReplies
-  if (humanReplies <= 0) return `${autoReplies}:0`
+  if (humanReplies === 0) return `${autoReplies}:0`
   const ratio = autoReplies / humanReplies
   return `${ratio.toFixed(1)}:1`
 }

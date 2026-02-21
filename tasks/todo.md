@@ -73,6 +73,15 @@
 - [x] **Cleanup**: Deleted temporary `backfill-arr` route + `backfill_arr.py`
 - [x] **Verified**: 10/10 structural checks + 4/4 spot-checks pass on live site, all 4 pages return 200
 
+## Completed (Round 8 — ARR Audit & Verification, Feb 21)
+- [x] **ARR formula audit**: Confirmed `unique_replies` = human only, `unique_replies_automatic` = auto only (independent counts)
+- [x] **Fixed broken subtraction formula**: Reverted from `auto / (total - auto)` (produced 999:1) to `auto / human` (correct)
+- [x] **Data staleness fix**: Triggered fresh sync — Supabase was missing auto replies from Feb 13+ (Instantly retroactive attribution)
+- [x] **Verified per-campaign**: C183 human=11, auto=46, ARR=4.2:1 (API match). ICP3 human=11, auto=32, ARR=2.9:1 (API match)
+- [x] **Color thresholds confirmed**: green <2:1, orange 2-3:1, red >=3:1
+- [x] **Lessons captured**: Lesson 12 (understand field semantics before writing formulas), Lesson 13 (diagnose data vs code before changing)
+- [x] **Skills updated**: ARR field semantics documented with CRITICAL notes
+
 ## Pending
 - [ ] Consider building a manual input UI for Booked Calls (form on reporting page, writes to Supabase)
 - [ ] Clean up temp files (query_crm_stages.py, parse_emails.py, .env.local.full)
