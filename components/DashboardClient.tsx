@@ -59,12 +59,15 @@ export default function DashboardClient({
       {/* Header row */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-bold text-white">Monthly Active</h1>
+          <h1 className="text-2xl font-bold text-white">Monthly</h1>
           <ViewToggle />
         </div>
         <div className="flex items-center gap-3">
           <span className="text-xs" style={{ color: '#6b7280' }}>
             Last updated: {lastRefresh.toLocaleTimeString('en-GB')}
+            {daily.length > 0 && (
+              <span style={{ color: '#f59e0b' }}> · Data to {daily[daily.length - 1].date}</span>
+            )}
           </span>
           <button
             onClick={refresh}
@@ -78,31 +81,21 @@ export default function DashboardClient({
       </div>
 
       {/* KPI Cards */}
-      {loading && !kpis.totalSent ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          {[...Array(5)].map((_, i) => <KPISkeleton key={i} />)}
+      {loading && !kpis.totalContacted ? (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => <KPISkeleton key={i} />)}
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           <KPICard
             title="Leads Contacted"
-            value={kpis.totalSent.toLocaleString()}
+            value={kpis.totalContacted.toLocaleString()}
             color="orange"
-            subtext={`${kpis.totalCampaigns} campaigns`}
           />
           <KPICard
-            title="Reply Rate"
-            value={`${kpis.replyRate.toFixed(2)}%`}
-            color="cyan"
-            subtext={`${kpis.totalReplies.toLocaleString()} replies`}
-            changeDirection="good-up"
-          />
-          <KPICard
-            title="Bounce Rate"
-            value={`${kpis.bounceRate.toFixed(2)}%`}
-            color={kpis.bounceRate < 1.5 ? 'green' : kpis.bounceRate < 2.5 ? 'yellow' : 'red'}
-            subtext={`${kpis.totalBounces.toLocaleString()} bounces`}
-            changeDirection="good-down"
+            title="Meetings Booked"
+            value={kpis.meetingsBooked}
+            color="purple"
           />
           <KPICard
             title="Opportunities"
@@ -113,7 +106,6 @@ export default function DashboardClient({
             title="Active Campaigns"
             value={kpis.activeCampaigns}
             color="green"
-            subtext={`of ${kpis.totalCampaigns} total`}
           />
         </div>
       )}

@@ -80,6 +80,8 @@ async function syncDailyAnalytics(supabase: Supabase) {
           unique_opened: day.unique_opened || 0,
           replies: day.replies || 0,
           unique_replies: day.unique_replies || 0,
+          replies_automatic: day.replies_automatic || 0,
+          unique_replies_automatic: day.unique_replies_automatic || 0,
           clicks: day.clicks || 0,
           unique_clicks: day.unique_clicks || 0,
           opportunities: day.opportunities || 0,
@@ -89,11 +91,11 @@ async function syncDailyAnalytics(supabase: Supabase) {
     }
   }
 
-  // 2. Per-campaign daily analytics for active campaigns (parallel, last 8 days)
+  // 2. Per-campaign daily analytics for active + recently paused/completed campaigns
   const { data: activeCampaigns } = await supabase
     .from('campaigns')
     .select('id')
-    .eq('status', 1)
+    .in('status', [1, 2, 3])
 
   let campaignsSynced = 0
   if (activeCampaigns && activeCampaigns.length > 0) {
@@ -125,6 +127,8 @@ async function syncDailyAnalytics(supabase: Supabase) {
                 unique_opened: day.unique_opened || 0,
                 replies: day.replies || 0,
                 unique_replies: day.unique_replies || 0,
+                replies_automatic: day.replies_automatic || 0,
+                unique_replies_automatic: day.unique_replies_automatic || 0,
                 clicks: day.clicks || 0,
                 unique_clicks: day.unique_clicks || 0,
                 opportunities: day.opportunities || 0,

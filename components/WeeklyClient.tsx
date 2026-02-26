@@ -58,12 +58,15 @@ export default function WeeklyClient({
       {/* Header row */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-bold text-white">Weekly Active</h1>
+          <h1 className="text-2xl font-bold text-white">Weekly</h1>
           <ViewToggle />
         </div>
         <div className="flex items-center gap-3">
           <span className="text-xs" style={{ color: '#6b7280' }}>
             Last updated: {lastRefresh.toLocaleTimeString('en-GB')}
+            {daily.length > 0 && (
+              <span style={{ color: '#f59e0b' }}> · Data to {daily[daily.length - 1].date}</span>
+            )}
           </span>
           <button
             onClick={refresh}
@@ -77,7 +80,7 @@ export default function WeeklyClient({
       </div>
 
       {/* KPI Cards */}
-      {loading && !kpis.totalSent ? (
+      {loading && !kpis.totalContacted ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => <KPISkeleton key={i} />)}
         </div>
@@ -85,14 +88,13 @@ export default function WeeklyClient({
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           <KPICard
             title="Leads Contacted"
-            value={kpis.totalSent.toLocaleString()}
+            value={kpis.totalContacted.toLocaleString()}
             color="orange"
           />
           <KPICard
-            title="Reply Rate"
-            value={`${kpis.replyRate.toFixed(2)}%`}
-            color="cyan"
-            subtext={`${kpis.totalReplies.toLocaleString()} replies`}
+            title="Meetings Booked"
+            value={kpis.meetingsBooked}
+            color="purple"
           />
           <KPICard
             title="Opportunities"

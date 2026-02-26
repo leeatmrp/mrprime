@@ -1,12 +1,13 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 
 export interface KPIData {
-  totalSent: number
+  totalContacted: number
   totalReplies: number
   replyRate: number
   totalBounces: number
   bounceRate: number
   totalOpportunities: number
+  meetingsBooked: number
   activeCampaigns: number
   totalCampaigns: number
 }
@@ -15,13 +16,11 @@ export interface CampaignRow {
   id: string
   name: string
   status: number
-  emails_sent_count: number
+  total_emails_sent: number
+  contacted_count: number
   reply_count: number
   bounce_count: number
   total_opportunities: number
-  leads_count: number
-  contacted_count: number
-  open_count: number
   auto_reply_count: number
 }
 
@@ -74,102 +73,101 @@ function currentMonthStart(): string {
 export async function fetchKPIs(supabase: SupabaseClient): Promise<KPIData> {
   const dateStr = currentMonthStart()
 
-  // Get active campaign IDs and bounce data
-  const { data: campaigns } = await supabase
-    .from('campaigns')
-    .select('id, bounce_count, emails_sent_count')
-    .eq('status', 1)
-
-  const activeCampaignIds = campaigns?.map(c => c.id) || []
-
-  // Use per-campaign daily data for active campaigns only
+  // Get all per-campaign daily data in the month (includes paused/completed)
   const { data, error } = await supabase
     .from('daily_analytics')
-    .select('new_leads_contacted, unique_replies, opportunities, campaign_id')
+    .select('new_leads_contacted, unique_replies, opportunities')
     .gte('date', dateStr)
     .not('campaign_id', 'is', null)
-    .in('campaign_id', activeCampaignIds)
 
   if (error) console.error('fetchKPIs error:', error)
 
+  // Count currently active campaigns for the KPI card
+  const { count: activeCampaigns } = await supabase
+    .from('campaigns')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 1)
+
   if (!data || data.length === 0) {
     return {
-      totalSent: 0, totalReplies: 0, replyRate: 0,
+      totalContacted: 0, totalReplies: 0, replyRate: 0,
       totalBounces: 0, bounceRate: 0, totalOpportunities: 0,
-      activeCampaigns: campaigns?.length || 0, totalCampaigns: campaigns?.length || 0,
+      meetingsBooked: 0,
+      activeCampaigns: activeCampaigns || 0, totalCampaigns: activeCampaigns || 0,
     }
   }
 
-  const totalSent = data.reduce((sum, r) => sum + (r.new_leads_contacted || 0), 0)
+  const totalContacted = data.reduce((sum, r) => sum + (r.new_leads_contacted || 0), 0)
   const totalReplies = data.reduce((sum, r) => sum + (r.unique_replies || 0), 0)
   const totalOpportunities = data.reduce((sum, r) => sum + (r.opportunities || 0), 0)
 
-  // Bounces aren't tracked in daily_analytics — use all-time from campaigns table
-  const totalBounces = campaigns?.reduce((sum, c) => sum + (c.bounce_count || 0), 0) || 0
-  const allTimeSent = campaigns?.reduce((sum, c) => sum + (c.emails_sent_count || 0), 0) || 0
-
   return {
-    totalSent,
+    totalContacted,
     totalReplies,
-    replyRate: totalSent > 0 ? (totalReplies / totalSent) * 100 : 0,
-    totalBounces,
-    bounceRate: allTimeSent > 0 ? (totalBounces / allTimeSent) * 100 : 0,
+    replyRate: totalContacted > 0 ? (totalReplies / totalContacted) * 100 : 0,
+    totalBounces: 0,
+    bounceRate: 0,
     totalOpportunities,
-    activeCampaigns: campaigns?.length || 0,
-    totalCampaigns: campaigns?.length || 0,
+    meetingsBooked: 0,
+    activeCampaigns: activeCampaigns || 0,
+    totalCampaigns: activeCampaigns || 0,
   }
 }
 
 export async function fetchCampaigns(supabase: SupabaseClient): Promise<CampaignRow[]> {
   const dateStr = currentMonthStart()
 
-  // Get MTD daily_analytics per campaign
+  // Get MTD daily_analytics per campaign (all campaigns, not just active)
   const { data: dailyData } = await supabase
     .from('daily_analytics')
-    .select('campaign_id, new_leads_contacted, unique_replies, unique_replies_automatic, opportunities')
+    .select('campaign_id, sent, new_leads_contacted, unique_replies, unique_replies_automatic, opportunities')
     .gte('date', dateStr)
     .not('campaign_id', 'is', null)
 
-  // Get campaign metadata
-  const { data: campaigns } = await supabase
-    .from('campaigns')
-    .select('id, name, status')
-    .eq('status', 1)
-
-  if (!campaigns || !dailyData) return []
+  if (!dailyData) return []
 
   // Aggregate daily data by campaign
-  const byCampaign: Record<string, { contacted: number; replies: number; autoReplies: number; opps: number }> = {}
+  const byCampaign: Record<string, { sent: number; contacted: number; replies: number; autoReplies: number; opps: number }> = {}
   for (const row of dailyData) {
     if (!row.campaign_id) continue
     if (!byCampaign[row.campaign_id]) {
-      byCampaign[row.campaign_id] = { contacted: 0, replies: 0, autoReplies: 0, opps: 0 }
+      byCampaign[row.campaign_id] = { sent: 0, contacted: 0, replies: 0, autoReplies: 0, opps: 0 }
     }
+    byCampaign[row.campaign_id].sent += row.sent || 0
     byCampaign[row.campaign_id].contacted += row.new_leads_contacted || 0
     byCampaign[row.campaign_id].replies += row.unique_replies || 0
     byCampaign[row.campaign_id].autoReplies += row.unique_replies_automatic || 0
     byCampaign[row.campaign_id].opps += row.opportunities || 0
   }
 
+  // Get metadata for all campaigns that had activity in the window
+  const campaignIds = Object.keys(byCampaign)
+  if (campaignIds.length === 0) return []
+
+  const { data: campaigns } = await supabase
+    .from('campaigns')
+    .select('id, name, status')
+    .in('id', campaignIds)
+
+  if (!campaigns) return []
+
   return campaigns
     .map(c => {
-      const mtd = byCampaign[c.id] || { contacted: 0, replies: 0, autoReplies: 0, opps: 0 }
+      const mtd = byCampaign[c.id] || { sent: 0, contacted: 0, replies: 0, autoReplies: 0, opps: 0 }
       return {
         id: c.id,
         name: c.name,
         status: c.status,
-        emails_sent_count: mtd.contacted,
+        total_emails_sent: mtd.sent,
+        contacted_count: mtd.contacted,
         reply_count: mtd.replies,
         bounce_count: 0,
         total_opportunities: mtd.opps,
-        leads_count: 0,
-        contacted_count: 0,
-        open_count: 0,
         auto_reply_count: mtd.autoReplies,
       }
     })
-    .filter(c => c.emails_sent_count > 0)
-    .sort((a, b) => b.emails_sent_count - a.emails_sent_count)
+    .filter(c => c.contacted_count > 0 || c.reply_count > 0 || c.total_opportunities > 0)
+    .sort((a, b) => b.contacted_count - a.contacted_count)
 }
 
 export async function fetchWeeklyKPIs(supabase: SupabaseClient): Promise<KPIData> {
@@ -177,43 +175,42 @@ export async function fetchWeeklyKPIs(supabase: SupabaseClient): Promise<KPIData
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
   const dateStr = sevenDaysAgo.toISOString().split('T')[0]
 
-  // Get active campaign IDs
-  const { data: campaigns } = await supabase
-    .from('campaigns')
-    .select('id')
-    .eq('status', 1)
-
-  const activeCampaignIds = campaigns?.map(c => c.id) || []
-
-  // Use per-campaign daily data for active campaigns only
+  // Get all per-campaign daily data in the 7-day window (includes paused/completed campaigns)
   const { data } = await supabase
     .from('daily_analytics')
     .select('new_leads_contacted, unique_replies, opportunities')
     .gte('date', dateStr)
     .not('campaign_id', 'is', null)
-    .in('campaign_id', activeCampaignIds)
+
+  // Count currently active campaigns separately for the KPI card
+  const { count: activeCampaigns } = await supabase
+    .from('campaigns')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 1)
 
   if (!data || data.length === 0) {
     return {
-      totalSent: 0, totalReplies: 0, replyRate: 0,
+      totalContacted: 0, totalReplies: 0, replyRate: 0,
       totalBounces: 0, bounceRate: 0, totalOpportunities: 0,
-      activeCampaigns: campaigns?.length || 0, totalCampaigns: campaigns?.length || 0,
+      meetingsBooked: 0,
+      activeCampaigns: activeCampaigns || 0, totalCampaigns: activeCampaigns || 0,
     }
   }
 
-  const totalSent = data.reduce((sum, r) => sum + (r.new_leads_contacted || 0), 0)
+  const totalContacted = data.reduce((sum, r) => sum + (r.new_leads_contacted || 0), 0)
   const totalReplies = data.reduce((sum, r) => sum + (r.unique_replies || 0), 0)
   const totalOpportunities = data.reduce((sum, r) => sum + (r.opportunities || 0), 0)
 
   return {
-    totalSent,
+    totalContacted,
     totalReplies,
-    replyRate: totalSent > 0 ? (totalReplies / totalSent) * 100 : 0,
+    replyRate: totalContacted > 0 ? (totalReplies / totalContacted) * 100 : 0,
     totalBounces: 0,
     bounceRate: 0,
     totalOpportunities,
-    activeCampaigns: campaigns?.length || 0,
-    totalCampaigns: campaigns?.length || 0,
+    meetingsBooked: 0,
+    activeCampaigns: activeCampaigns || 0,
+    totalCampaigns: activeCampaigns || 0,
   }
 }
 
@@ -222,52 +219,57 @@ export async function fetchWeeklyCampaigns(supabase: SupabaseClient): Promise<Ca
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
   const dateStr = sevenDaysAgo.toISOString().split('T')[0]
 
-  // Get 7-day daily_analytics per campaign
+  // Get 7-day daily_analytics per campaign (all campaigns, not just active)
   const { data: dailyData } = await supabase
     .from('daily_analytics')
-    .select('campaign_id, new_leads_contacted, unique_replies, unique_replies_automatic, opportunities')
+    .select('campaign_id, sent, new_leads_contacted, unique_replies, unique_replies_automatic, opportunities')
     .gte('date', dateStr)
     .not('campaign_id', 'is', null)
 
-  // Get campaign metadata
-  const { data: campaigns } = await supabase
-    .from('campaigns')
-    .select('id, name, status')
-    .eq('status', 1)
+  if (!dailyData) return []
 
-  if (!campaigns || !dailyData) return []
-
-  const byCampaign: Record<string, { contacted: number; replies: number; autoReplies: number; opps: number }> = {}
+  // Aggregate daily data by campaign
+  const byCampaign: Record<string, { sent: number; contacted: number; replies: number; autoReplies: number; opps: number }> = {}
   for (const row of dailyData) {
     if (!row.campaign_id) continue
     if (!byCampaign[row.campaign_id]) {
-      byCampaign[row.campaign_id] = { contacted: 0, replies: 0, autoReplies: 0, opps: 0 }
+      byCampaign[row.campaign_id] = { sent: 0, contacted: 0, replies: 0, autoReplies: 0, opps: 0 }
     }
+    byCampaign[row.campaign_id].sent += row.sent || 0
     byCampaign[row.campaign_id].contacted += row.new_leads_contacted || 0
     byCampaign[row.campaign_id].replies += row.unique_replies || 0
     byCampaign[row.campaign_id].autoReplies += row.unique_replies_automatic || 0
     byCampaign[row.campaign_id].opps += row.opportunities || 0
   }
 
+  // Get metadata for all campaigns that had activity in the window
+  const campaignIds = Object.keys(byCampaign)
+  if (campaignIds.length === 0) return []
+
+  const { data: campaigns } = await supabase
+    .from('campaigns')
+    .select('id, name, status')
+    .in('id', campaignIds)
+
+  if (!campaigns) return []
+
   return campaigns
     .map(c => {
-      const weekly = byCampaign[c.id] || { contacted: 0, replies: 0, autoReplies: 0, opps: 0 }
+      const weekly = byCampaign[c.id] || { sent: 0, contacted: 0, replies: 0, autoReplies: 0, opps: 0 }
       return {
         id: c.id,
         name: c.name,
         status: c.status,
-        emails_sent_count: weekly.contacted,
+        total_emails_sent: weekly.sent,
+        contacted_count: weekly.contacted,
         reply_count: weekly.replies,
         bounce_count: 0,
         total_opportunities: weekly.opps,
-        leads_count: 0,
-        contacted_count: 0,
-        open_count: 0,
         auto_reply_count: weekly.autoReplies,
       }
     })
-    .filter(c => c.emails_sent_count > 0)
-    .sort((a, b) => b.emails_sent_count - a.emails_sent_count)
+    .filter(c => c.contacted_count > 0 || c.reply_count > 0 || c.total_opportunities > 0)
+    .sort((a, b) => b.contacted_count - a.contacted_count)
 }
 
 export async function fetchDailyAnalytics(supabase: SupabaseClient, days: number = 0): Promise<DailyDataPoint[]> {
@@ -280,21 +282,12 @@ export async function fetchDailyAnalytics(supabase: SupabaseClient, days: number
     dateStr = currentMonthStart()
   }
 
-  // Get active campaign IDs
-  const { data: campaigns } = await supabase
-    .from('campaigns')
-    .select('id')
-    .eq('status', 1)
-
-  const activeCampaignIds = campaigns?.map(c => c.id) || []
-
-  // Use per-campaign data for active campaigns, summed by date
+  // Include ALL campaigns that had activity in the window
   const { data } = await supabase
     .from('daily_analytics')
     .select('date, new_leads_contacted, unique_replies, opportunities')
     .gte('date', dateStr)
     .not('campaign_id', 'is', null)
-    .in('campaign_id', activeCampaignIds)
     .order('date', { ascending: true })
 
   if (!data) return []

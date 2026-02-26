@@ -10,13 +10,14 @@ const statusLabels: Record<number, { label: string; bg: string; text: string }> 
 export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] }) {
   const totals = campaigns.reduce(
     (acc, c) => {
-      acc.contacted += c.emails_sent_count || 0
+      acc.sent += c.total_emails_sent || 0
+      acc.contacted += c.contacted_count || 0
       acc.replies += c.reply_count || 0
       acc.autoReplies += c.auto_reply_count || 0
       acc.opps += c.total_opportunities || 0
       return acc
     },
-    { contacted: 0, replies: 0, autoReplies: 0, opps: 0 }
+    { sent: 0, contacted: 0, replies: 0, autoReplies: 0, opps: 0 }
   )
   const totalReplyPct = totals.contacted > 0 ? (totals.replies / totals.contacted) * 100 : 0
   const totalArr = totals.replies > 0 ? totals.autoReplies / totals.replies : 0
@@ -30,7 +31,7 @@ export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] 
         <table className="w-full text-sm">
           <thead>
             <tr style={{ background: '#111827' }}>
-              {['Campaign', 'Status', 'Contacted', 'Replies', 'Reply %', 'ARR', 'Opps'].map(h => (
+              {['Campaign', 'Status', 'Contacted', 'Emails Sent', 'Replies', 'Reply %', 'ARR', 'Opps'].map(h => (
                 <th
                   key={h}
                   className="px-4 py-3 text-left font-medium whitespace-nowrap"
@@ -43,9 +44,8 @@ export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] 
           </thead>
           <tbody>
             {campaigns.map((c) => {
-              const contacted = c.emails_sent_count || 0
+              const contacted = c.contacted_count || 0
               const replyPct = contacted > 0 ? (c.reply_count / contacted) * 100 : 0
-              // unique_replies = human replies, unique_replies_automatic = auto (independent counts)
               const campArr = c.reply_count > 0 ? (c.auto_reply_count || 0) / c.reply_count : 0
               const status = statusLabels[c.status] || statusLabels[0]
               const arrColor = campArr < 2 ? '#10b981' : campArr <= 3 ? '#f97316' : '#ef4444'
@@ -69,6 +69,9 @@ export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] 
                   </td>
                   <td className="px-4 py-3 tabular-nums text-white">
                     {contacted.toLocaleString()}
+                  </td>
+                  <td className="px-4 py-3 tabular-nums" style={{ color: '#94a3b8' }}>
+                    {(c.total_emails_sent || 0).toLocaleString()}
                   </td>
                   <td className="px-4 py-3 tabular-nums" style={{ color: '#06b6d4' }}>
                     {(c.reply_count || 0).toLocaleString()}
@@ -95,6 +98,9 @@ export default function CampaignTable({ campaigns }: { campaigns: CampaignRow[] 
               <td className="px-4 py-3"></td>
               <td className="px-4 py-3 tabular-nums text-white">
                 {totals.contacted.toLocaleString()}
+              </td>
+              <td className="px-4 py-3 tabular-nums" style={{ color: '#94a3b8' }}>
+                {totals.sent.toLocaleString()}
               </td>
               <td className="px-4 py-3 tabular-nums" style={{ color: '#06b6d4' }}>
                 {totals.replies.toLocaleString()}
