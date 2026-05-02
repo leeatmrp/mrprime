@@ -19,6 +19,8 @@ export interface CampaignRow {
   total_emails_sent: number
   contacted_count: number
   reply_count: number
+  human_reply_count: number
+  positive_replies: number
   bounce_count: number
   total_opportunities: number
   auto_reply_count: number
@@ -65,6 +67,39 @@ export interface ReportingWeeklyRow {
   booked_calls_rate: number
 }
 
+// Exclude all CAP campaigns from dashboard views (not core email outreach)
+function isExcludedCampaign(name: string): boolean {
+  return /\bCAP\b/i.test(name)
+}
+
+// Extract copy angle name (mirrors sync/route.ts extractCopyAngle).
+// Used to identify angle names belonging to CAP campaigns.
+function extractCopyAngle(campaignName: string): string {
+  const parts = campaignName.split(' - ')
+  if (parts.length >= 4) return parts.slice(3).join(' - ').trim()
+  if (parts.length === 3) return parts[2].trim()
+  return campaignName.trim()
+}
+
+async function getExcludedCampaignIds(supabase: SupabaseClient): Promise<string[]> {
+  const { data } = await supabase.from('campaigns').select('id, name')
+  if (!data) return []
+  return data.filter(c => isExcludedCampaign(c.name)).map(c => c.id)
+}
+
+// Copy angle names belonging to CAP campaigns. These angle names may not
+// themselves contain "CAP" (e.g. "Product: MyProtein" is from a TikTok CAP
+// campaign), so isExcludedCampaign(name) alone misses them.
+async function getExcludedCopyAngleNames(supabase: SupabaseClient): Promise<Set<string>> {
+  const { data } = await supabase.from('campaigns').select('id, name')
+  if (!data) return new Set()
+  return new Set(
+    data
+      .filter(c => isExcludedCampaign(c.name))
+      .map(c => extractCopyAngle(c.name))
+  )
+}
+
 function currentMonthStart(): string {
   const now = new Date()
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
@@ -72,21 +107,30 @@ function currentMonthStart(): string {
 
 export async function fetchKPIs(supabase: SupabaseClient): Promise<KPIData> {
   const dateStr = currentMonthStart()
+  const excludedIds = await getExcludedCampaignIds(supabase)
 
   // Get all per-campaign daily data in the month (includes paused/completed)
-  const { data, error } = await supabase
+  let query = supabase
     .from('daily_analytics')
     .select('new_leads_contacted, unique_replies, opportunities')
     .gte('date', dateStr)
     .not('campaign_id', 'is', null)
+  if (excludedIds.length > 0) {
+    query = query.not('campaign_id', 'in', `(${excludedIds.join(',')})`)
+  }
+  const { data, error } = await query
 
   if (error) console.error('fetchKPIs error:', error)
 
-  // Count currently active campaigns for the KPI card
-  const { count: activeCampaigns } = await supabase
+  // Count currently active campaigns for the KPI card (excluding CAP)
+  let countQuery = supabase
     .from('campaigns')
     .select('id', { count: 'exact', head: true })
     .eq('status', 1)
+  if (excludedIds.length > 0) {
+    countQuery = countQuery.not('id', 'in', `(${excludedIds.join(',')})`)
+  }
+  const { count: activeCampaigns } = await countQuery
 
   if (!data || data.length === 0) {
     return {
@@ -146,12 +190,13 @@ export async function fetchCampaigns(supabase: SupabaseClient): Promise<Campaign
 
   const { data: campaigns } = await supabase
     .from('campaigns')
-    .select('id, name, status')
+    .select('id, name, status, positive_replies')
     .in('id', campaignIds)
 
   if (!campaigns) return []
 
   return campaigns
+    .filter(c => !isExcludedCampaign(c.name))
     .map(c => {
       const mtd = byCampaign[c.id] || { sent: 0, contacted: 0, replies: 0, autoReplies: 0, opps: 0 }
       return {
@@ -160,7 +205,9 @@ export async function fetchCampaigns(supabase: SupabaseClient): Promise<Campaign
         status: c.status,
         total_emails_sent: mtd.sent,
         contacted_count: mtd.contacted,
-        reply_count: mtd.replies,
+        reply_count: mtd.replies + mtd.autoReplies,
+        human_reply_count: mtd.replies,
+        positive_replies: c.positive_replies || 0,
         bounce_count: 0,
         total_opportunities: mtd.opps,
         auto_reply_count: mtd.autoReplies,
@@ -174,19 +221,28 @@ export async function fetchWeeklyKPIs(supabase: SupabaseClient): Promise<KPIData
   const sevenDaysAgo = new Date()
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
   const dateStr = sevenDaysAgo.toISOString().split('T')[0]
+  const excludedIds = await getExcludedCampaignIds(supabase)
 
   // Get all per-campaign daily data in the 7-day window (includes paused/completed campaigns)
-  const { data } = await supabase
+  let query = supabase
     .from('daily_analytics')
     .select('new_leads_contacted, unique_replies, opportunities')
     .gte('date', dateStr)
     .not('campaign_id', 'is', null)
+  if (excludedIds.length > 0) {
+    query = query.not('campaign_id', 'in', `(${excludedIds.join(',')})`)
+  }
+  const { data } = await query
 
-  // Count currently active campaigns separately for the KPI card
-  const { count: activeCampaigns } = await supabase
+  // Count currently active campaigns separately for the KPI card (excluding CAP)
+  let countQuery = supabase
     .from('campaigns')
     .select('id', { count: 'exact', head: true })
     .eq('status', 1)
+  if (excludedIds.length > 0) {
+    countQuery = countQuery.not('id', 'in', `(${excludedIds.join(',')})`)
+  }
+  const { count: activeCampaigns } = await countQuery
 
   if (!data || data.length === 0) {
     return {
@@ -248,12 +304,13 @@ export async function fetchWeeklyCampaigns(supabase: SupabaseClient): Promise<Ca
 
   const { data: campaigns } = await supabase
     .from('campaigns')
-    .select('id, name, status')
+    .select('id, name, status, positive_replies')
     .in('id', campaignIds)
 
   if (!campaigns) return []
 
   return campaigns
+    .filter(c => !isExcludedCampaign(c.name))
     .map(c => {
       const weekly = byCampaign[c.id] || { sent: 0, contacted: 0, replies: 0, autoReplies: 0, opps: 0 }
       return {
@@ -262,7 +319,9 @@ export async function fetchWeeklyCampaigns(supabase: SupabaseClient): Promise<Ca
         status: c.status,
         total_emails_sent: weekly.sent,
         contacted_count: weekly.contacted,
-        reply_count: weekly.replies,
+        reply_count: weekly.replies + weekly.autoReplies,
+        human_reply_count: weekly.replies,
+        positive_replies: c.positive_replies || 0,
         bounce_count: 0,
         total_opportunities: weekly.opps,
         auto_reply_count: weekly.autoReplies,
@@ -282,13 +341,19 @@ export async function fetchDailyAnalytics(supabase: SupabaseClient, days: number
     dateStr = currentMonthStart()
   }
 
-  // Include ALL campaigns that had activity in the window
-  const { data } = await supabase
+  const excludedIds = await getExcludedCampaignIds(supabase)
+
+  // Include ALL campaigns that had activity in the window (excluding CAP)
+  let query = supabase
     .from('daily_analytics')
     .select('date, new_leads_contacted, unique_replies, opportunities')
     .gte('date', dateStr)
     .not('campaign_id', 'is', null)
     .order('date', { ascending: true })
+  if (excludedIds.length > 0) {
+    query = query.not('campaign_id', 'in', `(${excludedIds.join(',')})`)
+  }
+  const { data } = await query
 
   if (!data) return []
 
@@ -368,13 +433,17 @@ export async function fetchCopyAnglesMonthly(supabase: SupabaseClient): Promise<
     .order('month', { ascending: false })
 
   if (error) console.error('fetchCopyAnglesMonthly error:', error)
-  return (data || []) as CopyAngleRow[]
+  const excludedAngleNames = await getExcludedCopyAngleNames(supabase)
+  return ((data || []) as CopyAngleRow[]).filter(
+    r => !isExcludedCampaign(r.campaign_name) && !excludedAngleNames.has(r.campaign_name)
+  )
 }
 
 export async function fetchReportingWeekly(supabase: SupabaseClient): Promise<ReportingWeeklyRow[]> {
   const { data, error } = await supabase
     .from('reporting_weekly')
     .select('week_start, total_email_sent, total_lead_contacted, replies, reply_rate, positive_replies, prr, booked_calls, booked_calls_rate')
+    .gt('total_lead_contacted', 0)
     .order('week_start', { ascending: true })
 
   if (error) console.error('fetchReportingWeekly error:', error)
