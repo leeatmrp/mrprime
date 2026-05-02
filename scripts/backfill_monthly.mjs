@@ -140,9 +140,10 @@ async function backfillMonth(ym, campaigns) {
     prr,
   })
 
-  // ---- copy_angles_monthly: ALL campaigns (CAP included) grouped by copy angle ----
+  // ---- copy_angles_monthly: non-CAP campaigns only ----
   const byCopyAngle = {}
   for (const r of dailyData) {
+    if (capIds.has(r.campaign_id)) continue
     const camp = campaignsById.get(r.campaign_id)
     if (!camp) continue
     const ca = extractCopyAngle(camp.name)
@@ -150,6 +151,17 @@ async function backfillMonth(ym, campaigns) {
     byCopyAngle[ca].contacted += r.new_leads_contacted || 0
     byCopyAngle[ca].replies += r.unique_replies || 0
     byCopyAngle[ca].auto += r.unique_replies_automatic || 0
+  }
+  // Delete any existing CAP-named rows so prior runs don't leave stale data.
+  // PostgREST in.() chokes on names with commas/colons/parens; use one DELETE per name.
+  const capCampaignNames = [...new Set(
+    campaigns.filter(c => capIds.has(c.id)).map(c => extractCopyAngle(c.name))
+  )]
+  for (const name of capCampaignNames) {
+    await sb(
+      `copy_angles_monthly?month=eq.${monthDate}&campaign_name=eq.${encodeURIComponent(name)}`,
+      { method: 'DELETE' }
+    )
   }
   // Filter out empty copy angles (no contacted)
   const angles = Object.entries(byCopyAngle).filter(([, v]) => v.contacted > 0)

@@ -499,10 +499,11 @@ async function syncReplyClassification(supabase: Supabase) {
       .in('id', Array.from(allClassifiedCampIds))
 
     if (campRows && campRows.length > 0) {
-      // Aggregate all classifications by copy angle name
+      // Aggregate all classifications by copy angle name (excluding CAP)
       const positiveByAngle: Record<string, number> = {}
       const totalRepliesByAngle: Record<string, number> = {}
       for (const camp of campRows) {
+        if (capCampaignIds.has(camp.id)) continue
         const caName = extractCopyAngle(camp.name)
         const pos = positiveByCampaign[camp.id] || 0
         const neg = notInterestedByCampaign[camp.id] || 0
@@ -567,13 +568,18 @@ function extractCopyAngle(campaignName: string): string {
 }
 
 async function syncCopyAnglesMonthly(supabase: Supabase) {
-  // Get all campaigns (active + completed + paused)
-  const { data: campaigns } = await supabase
+  // Get all campaigns (active + completed + paused), then exclude CAP
+  const { data: allCampaigns } = await supabase
     .from('campaigns')
     .select('id, name')
     .in('status', [1, 2, 3])
 
-  if (!campaigns || campaigns.length === 0) return { synced: 0 }
+  if (!allCampaigns || allCampaigns.length === 0) return { synced: 0 }
+
+  const capIds = new Set(
+    allCampaigns.filter((c: { name: string }) => /\bCAP\b/i.test(c.name)).map((c: { id: string }) => c.id)
+  )
+  const campaigns = allCampaigns.filter((c: { id: string }) => !capIds.has(c.id))
 
   // Current month boundaries
   const now = new Date()
@@ -732,9 +738,10 @@ async function refreshPastMonths(supabase: Supabase, monthsBack: number) {
         updated_at: new Date().toISOString(),
       }, { onConflict: 'month' })
 
-    // copy_angles_monthly: ALL campaigns (CAP included), grouped by copy angle
+    // copy_angles_monthly: non-CAP campaigns only, grouped by copy angle
     const byAngle: Record<string, { contacted: number; replies: number; auto: number }> = {}
     for (const r of rows) {
+      if (capIds.has(r.campaign_id)) continue
       const camp = campaignsById.get(r.campaign_id) as { name: string } | undefined
       if (!camp) continue
       const ca = extractCopyAngle(camp.name)
@@ -742,6 +749,17 @@ async function refreshPastMonths(supabase: Supabase, monthsBack: number) {
       byAngle[ca].contacted += r.new_leads_contacted || 0
       byAngle[ca].replies += r.unique_replies || 0
       byAngle[ca].auto += r.unique_replies_automatic || 0
+    }
+    // Sweep stale CAP-named rows (in case a campaign was reclassified or this is the first run)
+    const capCampaignNames = [...new Set(
+      campaigns.filter((c: { id: string }) => capIds.has(c.id)).map((c: { name: string }) => extractCopyAngle(c.name))
+    )]
+    if (capCampaignNames.length > 0) {
+      await supabase
+        .from('copy_angles_monthly')
+        .delete()
+        .eq('month', start)
+        .in('campaign_name', capCampaignNames)
     }
     const { data: existingCa } = await supabase
       .from('copy_angles_monthly')
